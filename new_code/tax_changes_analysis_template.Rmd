@@ -1,0 +1,234 @@
+---
+title: "Tax Changes Template"
+author: "Jack Landry"
+date: "5/24/2021"
+output: html_document
+---
+
+<style type="text/css">
+body{
+  font-family: Unna;
+  font-size: 12pt;
+}
+/* Headers */
+h1,h2,h3,h4,h5,h6{
+  font-size: 20pt;
+  text-align: center;
+}
+
+h1.title {
+  font-size: 38px;
+  text-align: center;
+}
+h4.author { 
+    font-size: 18px;
+  text-align: center;
+}
+h4.date { 
+  font-size: 18px;
+  text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE, cashe=TRUE}
+library(tidyverse)
+library(ipumsr)
+library(tidylog)
+library(kableExtra)
+library(here)
+here()
+#Tax units sent to calculator
+ids <- read_csv(here("outputs","ids.csv")) 
+#New policy results file
+new_policy <- read_csv(here("c17_taxsim-17-#-policy_alt-#.csv"))
+#Status quo policy results file
+status_quo_poicy <- read_csv(here("tax-calculator-code","c17_taxsim-17-#-#-#.csv"))
+
+new_policy <- new_policy %>% select(RECID,aftertax_income) %>% rename(new_pol_aftertax_income=aftertax_income)
+status_quo_poicy <- status_quo_poicy %>% select(RECID,aftertax_income) %>%
+  rename(stats_quo_pol_aftertax_income=aftertax_income)
+
+combo_data <- ids %>% left_join(status_quo_poicy) %>% left_join(new_policy)
+combo_data <- combo_data %>% mutate(diff_aftertax_income=new_pol_aftertax_income - stats_quo_pol_aftertax_income)
+
+#Now bring in CPS ASEC data raw data for analysis
+ddi <- read_ipums_ddi(here("cps_data","cps_00042.xml"))
+ipum <-  read_ipums_micro(ddi)
+names(ipum) <- tolower(names(ipum))
+#ipum <- ipum %>% select(year,age,serial,pernum,spmwt,spmthresh,spmtotres,spmfamunit) #Change this in the future
+
+#"Not every ASEC record became a tax unit, so make sure you keep master non-matches" (From Earnie)
+#So ASEC records that are not tax units had no change in income
+#Also, why didn't they become tax units, how is nonfiling handled?
+ipum <- ipum  %>% left_join(combo_data, by = c("serial","pernum"))
+```
+
+```{r, include=FALSE}
+#Need to be careful about how missings are treated, I think if they aren't in the tax data the change should be 0
+ipum <- ipum %>% group_by(spmfamunit) %>% 
+  mutate(diff_aftertax_income_family=sum(diff_aftertax_income)) %>% 
+  ungroup()
+
+sum(is.na(ipum$diff_aftertax_income)) #Ton of missings
+#New, setting difference in aftertax income to 0 if not a filing unit
+ipum <-ipum %>% 
+  mutate(diff_aftertax_income_family=ifelse(is.na(diff_aftertax_income_family),0,diff_aftertax_income_family))
+
+#Need to look at how this is done again, look at what these variables are
+#SPMTOTRES records the total economic resources of families and is used to construct the Supplemental Poverty Measure (SPM)
+#SPMTHRESH records the poverty threshold used to calculate the Supplemental Poverty Measure (SPM) for a family.
+ipum <- ipum %>% mutate(spm1 = spmtotres < spmthresh,
+                spm2 = (spmtotres + diff_aftertax_income_family) < spmthresh,
+                out_of_spm = ifelse((spm2 == 0 & spm1 == 1),1,0),
+                out_of_spm = ifelse(is.na(out_of_spm),0,out_of_spm)) #I think this is right but not sure 
+```
+
+```{r, include = FALSE}
+#Making a table out of my EITC changes
+eitc <- tibble(eitc = c(5000,5000,0,
+                        10000,10000,0,
+                        15000,15000,0,
+                        20000,20000,0), 
+               labor_income = c(0,30000,95359,
+                                0,30000,92578.2,
+                                0,30000,101025,
+                                0,30000,124967), 
+               group = c("0 Children","0 Children","0 Children",
+                         "1 Child", "1 Child", "1 Child",
+                         "2 Children", "2 Children", "2 Children",
+                         "3+ Children","3+ Children","3+ Children"))
+
+library(ggrepel)
+eitc_plot <- ggplot(eitc, aes(x = labor_income, y = eitc, group = group)) +
+  geom_line(color = "#572dff") +
+  theme_bw() + 
+  labs(y = "EITC  \nBenefit  ", x = "\nLabor Income", 
+       title = "New EITC Benefit For Single Filers",
+       caption = "Jain Family Institute") +
+  scale_y_continuous(labels=scales::dollar_format()) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="LM Roman 10"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+
+eitc_plot <- eitc_plot + 
+  annotate("label", label = "0 Children", x = 15000, y = 6000, size = 3.5, colour = "#572dff",
+           family= "LM Roman 10") +
+  annotate("label", label = "1 Child", x = 15000, y = 11000, size = 3.5, colour = "#572dff",
+           family= "LM Roman 10") +
+  annotate("label", label = "2 Children", x = 15000, y = 16000, size = 3.5, colour = "#572dff",
+           family= "LM Roman 10") +
+  annotate("label", label = "3+ Children", x = 15000, y = 21000, size = 3.5, colour = "#572dff",
+           family= "LM Roman 10") 
+```
+
+## Explination of Reform
+
+What does the reform look like? I think I want to add lines married filers, as well as a comparison to the status-quo EITC. 
+```{r, echo=FALSE, fig.align="center"}
+eitc_plot
+```
+
+
+```{r, include=FALSE}
+#Need to get the total HH numbers too
+#Need to round this whole thing, improve names, etc.
+tables_test <- ipum %>% summarise(
+  spm1_mean = weighted.mean(spm1, spmwt),
+  spm2_mean = weighted.mean(spm2, spmwt),
+  out_of_spm_mean = weighted.mean(out_of_spm, spmwt))
+#Trying to do this for children, poverty is at the hh level, but data is at the individual level
+#So for children, measuring the reduction in the % of children whose HH are in poverty
+child_poverty <- ipum %>% filter(age<18) %>% summarise(
+  spm1_mean = weighted.mean(spm1, spmwt),
+  spm2_mean = weighted.mean(spm2, spmwt),
+  out_of_spm_mean = weighted.mean(out_of_spm, spmwt)) #Wow this basically did not change
+percent_poverty_reduction <- (tables_test$spm1_mean-tables_test$spm2_mean)/tables_test$spm2_mean
+percent_poverty_reduction <- round(percent_poverty_reduction, 3)*100
+tables_test <- tables_test %>% rename(`Status Quo Poverty` = spm1_mean,
+                       `EITC Reform Poverty` = spm2_mean,
+                       `Poverty Reduction` = out_of_spm_mean
+                       )
+library(stringr.tools)
+tables_test <- tables_test %>% 
+  mutate(across(where(is.numeric), round, 3)) %>% 
+  mutate(across(where(is.numeric), ~ .x*100)) %>% 
+  mutate(across(where(is.numeric),as.character)) %>% 
+  mutate(across(where(is.character), ~str_suffix(.x,"%")))
+  
+
+```
+<!-- Calculating changes in poverty, want to make these nice tables -->
+<!-- Want to change the html to mimic Jain style as much as possible -->
+<!-- Look at exsample here: https://www.jainfamilyinstitute.org/news/robust-evidence-for-1400-relief-and-recovery-checks/ -->
+## Poverty Impacts of Expanded EITC
+
+Calculating changes in poverty from random changes to the EITC I made up. Need to add percentage points to this table.
+
+```{r, echo=FALSE}
+tables_test %>%
+  kbl() %>%
+  kable_minimal() %>% 
+  kable_styling(html_font = "Unna",
+                full_width = FALSE,
+                position = "center")
+
+```
+
+```{r, include=FALSE}
+#Getting number of HHs in poverty or whatever
+#https://cran.r-project.org/web/packages/ipumsr/vignettes/ipums-cps.html
+hhs_poverty_status_quo <- ipum %>% 
+  group_by(spm1) %>%
+  summarize(hhs_in_poverty = sum(spmwt)) %>% 
+  filter(spm1==TRUE) %>% pull()
+hhs_poverty_reform <- ipum %>% 
+  group_by(spm2) %>%
+  summarize(hhs_in_poverty = sum(spmwt)) %>% 
+  filter(spm2==TRUE) %>% pull()
+
+num_of_hh_out_of_poverty <- hhs_poverty_status_quo-hhs_poverty_reform
+```
+This reform caused a `r num_of_hh_out_of_poverty[1]` household poverty reduction, a `r percent_poverty_reduction[1]`% decrease. I need to fix the display of the household number (Trying to make these programmatic.) Need to be careful with HH vs. individual level.
+
+<!-- ## Income change by pre-policy income percentiles -->
+
+```{r, include = FALSE}
+
+ipum <- ipum %>% mutate(income_percentile=ntile(inctot,100))
+income_change_percentiles <- ipum %>% group_by(income_percentile) %>% 
+  summarise(income_change_from_policy=mean(diff_aftertax_income_family))
+
+#Need to figure out how the family unit stuff works
+# income_change_percentiles_no_children <- ipum %>% filter() %>% 
+#   group_by(income_percentile) %>% 
+#   summarise(income_change_from_policy=mean(diff_aftertax_income_family))
+
+income_percentile_change_plot <- ggplot(income_change_percentiles, aes(x = income_percentile, y = income_change_from_policy)) +
+  geom_line(color = "#572dff") +
+  theme_bw() +
+  scale_y_continuous(labels=scales::dollar_format()) +
+    theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="LM Roman 10"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) +
+  labs(y = "Average\nChange\nin\nIncome", x = "Pre-Policy Income Percentile", 
+       title = "Average Increase in Income From EITC Reform\nBy Pre-Policy Income Rank")
+```
+This seems implausible if I understand that changes I made to the EITC correctly. I seem to have an issue with non-matches in the tax data who have 0 income change. Don't think this can be explained by nonfiling, though I do need to figure out how that is handled.
+```{r, echo=FALSE, fig.align="center"}
+income_percentile_change_plot
+```
+
+Should do analysis for different groups, e.g. number of children, labor force status, race, more?
+
+<!-- ## Analysis of how non-filing reduces benefits?  -->
+
+
