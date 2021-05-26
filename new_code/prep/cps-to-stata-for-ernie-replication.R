@@ -1,0 +1,5 @@
+library(haven)
+ddi <- read_ipums_ddi(here("cps_data","cps_00042.xml"))
+ipum <-  read_ipums_micro(ddi)
+names(ipum) <- tolower(names(ipum))
+write_dta(ipum, here("random","cps_17.dta"))
