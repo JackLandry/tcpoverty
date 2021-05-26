@@ -1,0 +1,18 @@
+// Eliminates Phase-In (This caused problems in the past)
+// Phase in rate for 0 kids, 1 kid, 2 kids, 3+ kids (Changed to 0 because EITC_basic_frac + EITC_rt must be less than 1), maybe that will fix error. But if I get an error try eliminates both of these
+// Phase out thresehold for 0 kids, 1 kid, 2 kids, 3+ kids
+// Additional phase out for married filing jointly (didn't change status quo)
+// Max EITC credit for 0 kids, 1 kid, 2 kids, 3+ kids
+// Phase out rate (unchanged)
+// Starting with this, we'll see if it works
+
+{
+    "EITC_basic_frac": {"2017": 1},
+    "EITC_rt": {"2017": [0.0,0.0,0.0,0.0]},
+    "EITC_ps": {"2017": [30000.0, 30000.0, 30000.0, 30000.0]},
+    "EITC_ps_MarriedJ": {"2017": [5590.0, 5590.0, 5590.0, 5590.0]},
+    "EITC_c": {"2017": [5000.0, 10000.0, 15000.0, 20000.0]},
+    "EITC_prt": {"2017": [0.0765, 0.1598, 0.2106, 0.2106]}
+}
+
+

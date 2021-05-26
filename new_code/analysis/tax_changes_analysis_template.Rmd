@@ -222,13 +222,44 @@ income_percentile_change_plot <- ggplot(income_change_percentiles, aes(x = incom
   labs(y = "Average\nChange\nin\nIncome", x = "Pre-Policy Income Percentile", 
        title = "Average Increase in Income From EITC Reform\nBy Pre-Policy Income Rank")
 ```
-This seems implausible if I understand that changes I made to the EITC correctly. I seem to have an issue with non-matches in the tax data who have 0 income change. Don't think this can be explained by nonfiling, though I do need to figure out how that is handled.
+This 
+
+This seems implausible if I understand that changes I made to the EITC correctly. Shouldn't every filing unit at the lowest end of the income spectrum be getting at least 5 grand? This analysis is at the individual level, while income increases are at the tax-filing unit level, so average over each person, maybe it does make sense? It could be that I have an issue with non-matches in the tax data who then have 0 income change. Don't think this can be explained by non-filing, though I do need to figure out how that is handled.
+
+Want to replicate the numbers in Ernie's thing, then maybe some of the exsamples given in the documentation for validation of things other than the the programming of the EITC reform that I'm doing this correctly...
+
 ```{r, echo=FALSE, fig.align="center"}
 income_percentile_change_plot
 ```
 
-Should do analysis for different groups, e.g. number of children, labor force status, race, more?
+Should do analysis for different groups, e.g. number of children (that's a HH thing), labor force status, race, more?
+
+```{r, include =FALSE}
+test <- ipum %>% filter(labforce!=0 & age>24 & age <65) %>% #prime age labor force or some shit, need to look up the definition
+  mutate(labor_force=ifelse(labforce==1,"Not In Labor Force",
+                            ifelse(labforce==2,"In Labor Force",NA)),
+         income_percentile_20=ntile(inctot,20)) %>% 
+  group_by(income_percentile_20,labor_force) %>% #Made this to 20 but should just group 1-5, 6-10 etc.
+  summarise(income_change_from_policy=mean(diff_aftertax_income_family))
+ggplot(test, aes(x = income_percentile_20, y = income_change_from_policy, group = labor_force)) +
+  geom_line(aes(color=as.factor(labor_force))) + #Find complementary colors
+  theme_bw() +
+  scale_y_continuous(labels=scales::dollar_format()) +
+    theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="LM Roman 10"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) +
+  guides(color=guide_legend("")) + 
+  labs(y = "Average\nChange\nin\nIncome", x = "Pre-Policy Income Percentile", 
+       title = "Average Increase in Income From EITC Reform\nBy Pre-Policy Income Rank And Labor Force Status",
+       caption = "Prime Age Workers Only")
+```
 
 <!-- ## Analysis of how non-filing reduces benefits?  -->
+
+Also need to look at policy with CTC and other stuff recently passed...
 
 
