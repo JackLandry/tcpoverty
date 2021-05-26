@@ -108,7 +108,7 @@ eitc_plot <- ggplot(eitc, aes(x = labor_income, y = eitc, group = group)) +
   scale_y_continuous(labels=scales::dollar_format()) +
   scale_x_continuous(labels=scales::dollar_format()) +
   theme(plot.title = element_text(hjust = 0.5),
-        text=element_text(family="LM Roman 10"), #Want to change this to Jain font, need to ask for it
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
         panel.grid.minor = element_blank(),
         axis.title.y = element_text(angle=0, vjust = 0.5),
         panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
@@ -117,18 +117,18 @@ eitc_plot <- ggplot(eitc, aes(x = labor_income, y = eitc, group = group)) +
 
 eitc_plot <- eitc_plot + 
   annotate("label", label = "0 Children", x = 15000, y = 6000, size = 3.5, colour = "#572dff",
-           family= "LM Roman 10") +
+           family= "Unna") +
   annotate("label", label = "1 Child", x = 15000, y = 11000, size = 3.5, colour = "#572dff",
-           family= "LM Roman 10") +
+           family= "Unna") +
   annotate("label", label = "2 Children", x = 15000, y = 16000, size = 3.5, colour = "#572dff",
-           family= "LM Roman 10") +
+           family= "Unna") +
   annotate("label", label = "3+ Children", x = 15000, y = 21000, size = 3.5, colour = "#572dff",
-           family= "LM Roman 10") 
+           family= "Unna") 
 ```
 
 ## Explination of Reform
 
-What does the reform look like? I think I want to add lines married filers, as well as a comparison to the status-quo EITC. 
+What does the reform look like? Here, I pick pretty arbitrary numbers at remove the phase in, increase the max benefit, and increase the phase out threshold. I didn't touch the phase out rate (double check), should I do that in the future? I think I want to add lines for married filers, as well as a comparison to the status-quo EITC. Maybe add some light gray lines for the status-quo? Labels might get messy.
 ```{r, echo=FALSE, fig.align="center"}
 eitc_plot
 ```
@@ -146,13 +146,15 @@ tables_test <- ipum %>% summarise(
 child_poverty <- ipum %>% filter(age<18) %>% summarise(
   spm1_mean = weighted.mean(spm1, spmwt),
   spm2_mean = weighted.mean(spm2, spmwt),
-  out_of_spm_mean = weighted.mean(out_of_spm, spmwt)) #Wow this basically did not change
+  out_of_spm_mean = weighted.mean(out_of_spm, spmwt)) 
 percent_poverty_reduction <- (tables_test$spm1_mean-tables_test$spm2_mean)/tables_test$spm2_mean
 percent_poverty_reduction <- round(percent_poverty_reduction, 3)*100
+percentage_point_poverty_reduction <- round(tables_test$out_of_spm_mean, 3)*100
 tables_test <- tables_test %>% rename(`Status Quo Poverty` = spm1_mean,
                        `EITC Reform Poverty` = spm2_mean,
                        `Poverty Reduction` = out_of_spm_mean
                        )
+
 library(stringr.tools)
 tables_test <- tables_test %>% 
   mutate(across(where(is.numeric), round, 3)) %>% 
@@ -167,7 +169,7 @@ tables_test <- tables_test %>%
 <!-- Look at exsample here: https://www.jainfamilyinstitute.org/news/robust-evidence-for-1400-relief-and-recovery-checks/ -->
 ## Poverty Impacts of Expanded EITC
 
-Calculating changes in poverty from random changes to the EITC I made up. Need to add percentage points to this table.
+Calculating changes in poverty from random changes to the EITC I made up. Want to add a column for catagory, and then add rows for overall, children, and more groups. Note that poverty measure is at the HH level, and most catagories would be at the individual level.
 
 ```{r, echo=FALSE}
 tables_test %>%
@@ -192,10 +194,11 @@ hhs_poverty_reform <- ipum %>%
   filter(spm2==TRUE) %>% pull()
 
 num_of_hh_out_of_poverty <- hhs_poverty_status_quo-hhs_poverty_reform
+num_of_hh_out_of_poverty <- prettyNum(num_of_hh_out_of_poverty,big.mark=",",scientific=FALSE) #Making this display nicely
 ```
-This reform caused a `r num_of_hh_out_of_poverty[1]` household poverty reduction, a `r percent_poverty_reduction[1]`% decrease. I need to fix the display of the household number (Trying to make these programmatic.) Need to be careful with HH vs. individual level.
+This reform caused a `r num_of_hh_out_of_poverty[1]` household poverty reduction, a `r percent_poverty_reduction[1]`% decrease (a `r percentage_point_poverty_reduction[1]` percentage point reduction). Need to be careful with HH vs. individual level.
 
-<!-- ## Income change by pre-policy income percentiles -->
+## Effects Across the Income Distribution
 
 ```{r, include = FALSE}
 
@@ -213,7 +216,7 @@ income_percentile_change_plot <- ggplot(income_change_percentiles, aes(x = incom
   theme_bw() +
   scale_y_continuous(labels=scales::dollar_format()) +
     theme(plot.title = element_text(hjust = 0.5),
-        text=element_text(family="LM Roman 10"), #Want to change this to Jain font, need to ask for it
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
         panel.grid.minor = element_blank(),
         axis.title.y = element_text(angle=0, vjust = 0.5),
         panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
@@ -222,7 +225,8 @@ income_percentile_change_plot <- ggplot(income_change_percentiles, aes(x = incom
   labs(y = "Average\nChange\nin\nIncome", x = "Pre-Policy Income Percentile", 
        title = "Average Increase in Income From EITC Reform\nBy Pre-Policy Income Rank")
 ```
-This 
+
+Need to add info about what income is exactly here.... 
 
 This seems implausible if I understand that changes I made to the EITC correctly. Shouldn't every filing unit at the lowest end of the income spectrum be getting at least 5 grand? This analysis is at the individual level, while income increases are at the tax-filing unit level, so average over each person, maybe it does make sense? It could be that I have an issue with non-matches in the tax data who then have 0 income change. Don't think this can be explained by non-filing, though I do need to figure out how that is handled.
 
@@ -241,12 +245,13 @@ test <- ipum %>% filter(labforce!=0 & age>24 & age <65) %>% #prime age labor for
          income_percentile_20=ntile(inctot,20)) %>% 
   group_by(income_percentile_20,labor_force) %>% #Made this to 20 but should just group 1-5, 6-10 etc.
   summarise(income_change_from_policy=mean(diff_aftertax_income_family))
+
 ggplot(test, aes(x = income_percentile_20, y = income_change_from_policy, group = labor_force)) +
   geom_line(aes(color=as.factor(labor_force))) + #Find complementary colors
   theme_bw() +
   scale_y_continuous(labels=scales::dollar_format()) +
     theme(plot.title = element_text(hjust = 0.5),
-        text=element_text(family="LM Roman 10"), #Want to change this to Jain font, need to ask for it
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
         panel.grid.minor = element_blank(),
         axis.title.y = element_text(angle=0, vjust = 0.5),
         panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
@@ -260,6 +265,6 @@ ggplot(test, aes(x = income_percentile_20, y = income_change_from_policy, group 
 
 <!-- ## Analysis of how non-filing reduces benefits?  -->
 
-Also need to look at policy with CTC and other stuff recently passed...
+Also need to look at policy with CTC and other stuff recently passed
 
 
