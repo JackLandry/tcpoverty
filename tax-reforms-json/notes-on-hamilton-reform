@@ -1,0 +1,62 @@
+Under these terms, a maximum refund lifts a household
+earning $0 up to the level of the poverty line, with a gradual phase-down beginning for households with income
+above $10,000 or $15,000 (for single-adult households and two-adult households, respectively), until phasing out
+at approximately the national median household income, at $50,000 or $70,000, respectively. Every individual
+adult is qualified to receive annual monetary support of up to $12,500, regardless of their household composition
+or filing status. Families with children will also receive an additional grant for every child.
+
+Every household will also receive an additional support of up to $4,500 per child.
+
+
+
+We allocate the full refund value to adults with a household income below $10,000 in a single-adult household and below $15,000 in a two-adult household. The maximum refund value is $12,500 for single-adults or $25,000 for married or cohabitating-adult households. For households with income above the maximum-refund threshold, the value of the refund declines linearly to zero, at a rate of 31.9 percent for single-adult households and 46.4 percent for two-adult households, to fully phase out at $50,000 and $70,000 of income, respectively. The child refund is allocated similarly, with the full child grant of $4,500 for households with income below $10,000 for households with one adult or $15,000 in households with two adults. Child refund values then decline linearly at a rate of 11.25 percent and 8.18 percent, respectively, in one- and two-adult households, to fully phase out at the same respective $50,000 and $70,000 income levels.
+
+
+Phase out threshold is 10k for single, 15k 2 adult households, so 5k aditional for married filing jointly.
+Max refund 12.5k single, 25k married.... There is no parameter for additional amount for married filing jointly. There is only a different phaseout for married filing jointly..
+
+This is flagge as a Github issue here: https://github.com/PSLmodels/Tax-Calculator/issues/2546
+This github issue shows the base code for the EITC stuff: https://github.com/PSLmodels/Tax-Calculator/issues/2092
+Can find EITC stuff here: https://github.com/PSLmodels/Tax-Calculator/blob/fbcea58fdc35c2db70d1cf99817f1e124523f710/taxcalc/calcfunctions.py
+Here's the contributor guide for making my own changes: http://taxcalc.pslmodels.org/contributing/contributor_guide.html
+
+
+
+
+EITC_indiv¶
+
+Description: Current-law value is false implying EITC is filing-unit based; a value of true implies EITC is computed for each individual wage earner. The additional phaseout start for joint filers is not affected by this parameter, nor are investment income and age eligibilty rules.
+Has An Effect When Using: PUF data: True CPS data: True
+Can Be Inflation Indexed: False Is Inflation Indexed: False
+Value Type: bool
+Known Values:
+2013: False
+2014: False
+2015: False
+2016: False
+2017: False
+2018: False
+2019: False
+Valid Range: min = False and max = True
+Out-of-Range Action: error
+EITC_sep_filers_elig¶
+
+Description: Current-law value is false, implying ineligibility.
+Has An Effect When Using: PUF data: True CPS data: False
+Can Be Inflation Indexed: False Is Inflation Indexed: False
+Value Type: bool
+Known Values:
+2013: False
+2014: False
+2015: False
+2016: False
+2017: False
+2018: False
+2019: False
+Valid Range: min = False and max = True
+Out-of-Range Action: error
+
+
+
+
+They say two ault, on't do the whole marrige thing.
