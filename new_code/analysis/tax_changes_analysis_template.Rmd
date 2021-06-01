@@ -31,10 +31,12 @@ h4.date {
 </style>
 
 ```{r setup, include=FALSE, cashe=TRUE}
+#Not sure i
 library(tidyverse)
 library(ipumsr)
 library(tidylog)
 library(kableExtra)
+library(stringr.tools)
 library(here)
 here()
 #Tax units sent to calculator
@@ -71,18 +73,24 @@ ipum <- ipum  %>% left_join(combo_data, by = c("serial","pernum"))
 ```{r, include=FALSE}
 ipum <- ipum %>% mutate(no_aftertax_income=ifelse(is.na(diff_aftertax_income),1,0),
                         diff_aftertax_income=ifelse(is.na(diff_aftertax_income),0,diff_aftertax_income)) 
+
 #Need to be careful about how missings are treated, I think if they aren't in the tax data the change should be 0
 ipum <- ipum %>% group_by(spmfamunit) %>% 
   mutate(diff_aftertax_income_family=sum(diff_aftertax_income)) %>% 
   ungroup()
 
-#Need to look at how this is done again, look at what these variables are
 #SPMTOTRES records the total economic resources of families and is used to construct the Supplemental Poverty Measure (SPM)
 #SPMTHRESH records the poverty threshold used to calculate the Supplemental Poverty Measure (SPM) for a family.
-ipum <- ipum %>% mutate(spm1 = spmtotres < spmthresh,
-                spm2 = (spmtotres + diff_aftertax_income_family) < spmthresh,
-                out_of_spm = ifelse((spm2 == 0 & spm1 == 1),1,0),
-                out_of_spm = ifelse(is.na(out_of_spm),0,out_of_spm)) #I think this is right but not sure 
+
+ipum <- ipum %>% mutate(deep_poverty=spmthresh*.5,
+                baseline_poverty = spmtotres < spmthresh,
+                post_reform_poverty = (spmtotres + diff_aftertax_income_family) < spmthresh,
+                out_of_poverty = ifelse((post_reform_poverty == 0 & baseline_poverty == 1),1,0),
+                out_of_poverty = ifelse(is.na(out_of_poverty),0,out_of_poverty),
+                baseline_deep_poverty=spmtotres < deep_poverty,
+                post_reform_deep_poverty=(spmtotres + diff_aftertax_income_family) < deep_poverty,
+                out_of_deep_poverty = ifelse((post_reform_deep_poverty == 0 & baseline_deep_poverty == 1),1,0),
+                out_of_poverty = ifelse(is.na(out_of_deep_poverty),0,out_of_deep_poverty)) 
 
 
 
@@ -131,80 +139,128 @@ eitc_plot <- eitc_plot +
            family= "Unna") 
 ```
 
-## Explination of Reform
+## Explanation of Reform
 
-What does the reform look like? Here, I pick pretty arbitrary numbers at remove the phase in, increase the max benefit, and increase the phase out threshold. I didn't touch the phase out rate (double check), should I do that in the future? I think I want to add lines for married filers, as well as a comparison to the status-quo EITC. Maybe add some light gray lines for the status-quo? Labels might get messy.
+What does the reform look like? Here, I pick pretty arbitrary numbers to remove the phase in, increase the max benefit, and increase the phase out threshold. I didn't touch the phase out rate (double check), should I do that in the future? I think I want to add lines for married filers, as well as a comparison to the status-quo EITC. Maybe add some light gray lines for the status-quo? Labels might get messy.
 ```{r, echo=FALSE, fig.align="center"}
 eitc_plot
 ```
 
+Should maybe add how post-tax income varies with labor income pre-post reform by number of kids.
 
 ```{r, include=FALSE}
-#Need to get the total HH numbers too
-#Need to round this whole thing, improve names, etc.
-tables_test <- ipum %>% summarise(
-  spm1_mean = weighted.mean(spm1, spmwt),
-  spm2_mean = weighted.mean(spm2, spmwt),
-  out_of_spm_mean = weighted.mean(out_of_spm, spmwt))
+#Add deep poverty to this
+overall_poverty <- ipum %>% summarise(
+  baseline_poverty_mean = weighted.mean(baseline_poverty, spmwt),
+  reform_poverty_mean = weighted.mean(post_reform_poverty, spmwt),
+  reform_poverty_reduction = weighted.mean(out_of_poverty, spmwt))
 #Trying to do this for children, poverty is at the hh level, but data is at the individual level
 #So for children, measuring the reduction in the % of children whose HH are in poverty
 child_poverty <- ipum %>% filter(age<18) %>% summarise(
-  spm1_mean = weighted.mean(spm1, spmwt),
-  spm2_mean = weighted.mean(spm2, spmwt),
-  out_of_spm_mean = weighted.mean(out_of_spm, spmwt)) 
-percent_poverty_reduction <- (tables_test$spm1_mean-tables_test$spm2_mean)/tables_test$spm2_mean
+  baseline_poverty_mean = weighted.mean(baseline_poverty, spmwt),
+  reform_poverty_mean = weighted.mean(post_reform_poverty, spmwt),
+  reform_poverty_reduction = weighted.mean(out_of_poverty, spmwt)) 
+
+#Separate table for deep poverty, if I do any more thresholds make this a function
+overall_deep_poverty <- ipum %>% summarise(
+  baseline_deep_poverty_mean = weighted.mean(baseline_deep_poverty,spmwt),
+  reform_deep_poverty_mean = weighted.mean(post_reform_deep_poverty,spmwt),
+  reform_deep_poverty_reduction = weighted.mean(out_of_deep_poverty,spmwt)) %>% 
+  mutate(Group = "Overall")
+
+child_deep_poverty <- ipum %>% filter(age<18) %>% summarise(
+  baseline_deep_poverty_mean = weighted.mean(baseline_deep_poverty,spmwt),
+  reform_deep_poverty_mean = weighted.mean(post_reform_deep_poverty,spmwt),
+  reform_deep_poverty_reduction = weighted.mean(out_of_deep_poverty,spmwt)) %>% 
+  mutate(Group = "Children")
+
+#Want to do more groups here
+
+
+percent_poverty_reduction <- (overall_poverty$baseline_poverty_mean-overall_poverty$reform_poverty_mean)/overall_poverty$baseline_poverty_mean
+
 percent_poverty_reduction <- round(percent_poverty_reduction, 3)*100
-percentage_point_poverty_reduction <- round(tables_test$out_of_spm_mean, 3)*100
-tables_test <- tables_test %>% rename(`Status Quo Poverty` = spm1_mean,
-                       `EITC Reform Poverty` = spm2_mean,
-                       `Poverty Reduction` = out_of_spm_mean
+percentage_point_poverty_reduction <- round(overall_poverty$reform_poverty_reduction, 3)*100
+child_poverty <- child_poverty %>% mutate(Group="Children")
+overall_poverty <- overall_poverty %>% mutate(Group="Overall")
+poverty_table <- bind_rows(overall_poverty,child_poverty)
+poverty_table <- poverty_table %>% rename(`Status Quo Poverty` = baseline_poverty_mean,
+                       `EITC Reform Poverty` = reform_poverty_mean,
+                       `Poverty Reduction` = reform_poverty_reduction
                        )
 
-library(stringr.tools)
-tables_test <- tables_test %>% 
+
+poverty_table <- poverty_table %>% 
   mutate(across(where(is.numeric), round, 3)) %>% 
   mutate(across(where(is.numeric), ~ .x*100)) %>% 
   mutate(across(where(is.numeric),as.character)) %>% 
-  mutate(across(where(is.character), ~str_suffix(.x,"%")))
-  
+  mutate(across(`Status Quo Poverty`:`Poverty Reduction`, ~str_suffix(.x,"%"))) %>% 
+  relocate(Group)
+
+deep_poverty_table <- bind_rows(overall_deep_poverty,child_deep_poverty)
+deep_poverty_table <- deep_poverty_table %>% rename(`Status Quo Deep Poverty` = baseline_deep_poverty_mean,
+                       `EITC Reform Deep Poverty` = reform_deep_poverty_mean,
+                       `Deep Poverty Reduction` = reform_deep_poverty_reduction
+                       )
+
+deep_poverty_table <- deep_poverty_table %>% 
+  mutate(across(where(is.numeric), round, 3)) %>% 
+  mutate(across(where(is.numeric), ~ .x*100)) %>% 
+  mutate(across(where(is.numeric),as.character)) %>% 
+  mutate(across(`Status Quo Deep Poverty`:`Deep Poverty Reduction`, ~str_suffix(.x,"%"))) %>% 
+  relocate(Group)
+
 
 ```
 <!-- Calculating changes in poverty, want to make these nice tables -->
 <!-- Want to change the html to mimic Jain style as much as possible -->
-<!-- Look at exsample here: https://www.jainfamilyinstitute.org/news/robust-evidence-for-1400-relief-and-recovery-checks/ -->
+<!-- Look at example here: https://www.jainfamilyinstitute.org/news/robust-evidence-for-1400-relief-and-recovery-checks/ -->
 ## Poverty Impacts of Expanded EITC
 
-Calculating changes in poverty from random changes to the EITC I made up. Want to add a column for catagory, and then add rows for overall, children, and more groups. Note that poverty measure is at the HH level, and most catagories would be at the individual level.
+Calculating changes in poverty from random changes to the EITC I made up. Note that poverty measure is at the HH level, and most categories would be at the individual level. 
 
 ```{r, echo=FALSE}
-tables_test %>%
+poverty_table %>%
   kbl() %>%
   kable_minimal() %>% 
   kable_styling(html_font = "Unna",
                 full_width = FALSE,
                 position = "center")
 
-```
 
+```
 ```{r, include=FALSE}
 #Getting number of HHs in poverty or whatever
 #https://cran.r-project.org/web/packages/ipumsr/vignettes/ipums-cps.html
 hhs_poverty_status_quo <- ipum %>% 
-  group_by(spm1) %>%
+  group_by(baseline_poverty) %>%
   summarize(hhs_in_poverty = sum(spmwt)) %>% 
-  filter(spm1==TRUE) %>% pull()
+  filter(baseline_poverty==TRUE) %>% pull()
 hhs_poverty_reform <- ipum %>% 
-  group_by(spm2) %>%
+  group_by(post_reform_poverty) %>%
   summarize(hhs_in_poverty = sum(spmwt)) %>% 
-  filter(spm2==TRUE) %>% pull()
+  filter(post_reform_poverty==TRUE) %>% pull()
 
 num_of_hh_out_of_poverty <- hhs_poverty_status_quo-hhs_poverty_reform
 num_of_hh_out_of_poverty <- prettyNum(num_of_hh_out_of_poverty,big.mark=",",scientific=FALSE) #Making this display nicely
 ```
 This reform caused a `r num_of_hh_out_of_poverty[1]` household poverty reduction, a `r percent_poverty_reduction[1]`% decrease (a `r percentage_point_poverty_reduction[1]` percentage point reduction). Need to be careful with HH vs. individual level.
 
+## Deep Poverty Impacts of Expanded EITC
+```{r, echo=FALSE}
+deep_poverty_table %>%
+  kbl() %>%
+  kable_minimal() %>% 
+  kable_styling(html_font = "Unna",
+                full_width = FALSE,
+                position = "center")
+```
+
+
+
 
 ```{r, include = FALSE}
+#Making sure all the income differences are attributable to the EITC (yes, basically not seeing any dynamic effects)
 ipum %>% mutate(eitc_diff=reform_eitc-status_quo_eitc,
                         diff_aftertax_income_no_eitc=eitc_diff-diff_aftertax_income) %>% 
   summarise(across(c(eitc_diff:diff_aftertax_income_no_eitc), mean, na.rm=TRUE)) ## removing nas which maybe should be 0s
@@ -212,10 +268,12 @@ ipum %>% mutate(eitc_diff=reform_eitc-status_quo_eitc,
 ## Effects Across the Income Distribution
 
 ```{r, include = FALSE}
-#Need to be careful, this is not a cleaned I
+#Need to be careful, this is not a cleaned CPS, for analysis of other variables I need to clean stuff
 ipum <- ipum %>% mutate(total_income=ifelse(inctot==999999999,NA,inctot),
-                        income_percentile=ntile(total_income,100)) #This is individual level income? when maybe I want family unit level
-income_change_percentiles <- ipum %>% group_by(income_percentile) %>% 
+                        income_percentile=ntile(total_income,100),
+                        income_percentile_20=ntile(total_income,20),
+                        income_percentile_20=income_percentile_20*5) 
+income_change_percentiles <- ipum %>% group_by(income_percentile_20) %>% 
   summarise(income_change_from_policy=mean(diff_aftertax_income_family))
 
 #Need to figure out how the family unit stuff works
@@ -223,10 +281,11 @@ income_change_percentiles <- ipum %>% group_by(income_percentile) %>%
 #   group_by(income_percentile) %>% 
 #   summarise(income_change_from_policy=mean(diff_aftertax_income_family))
 
-income_percentile_change_plot <- ggplot(income_change_percentiles, aes(x = income_percentile, y = income_change_from_policy)) +
+income_percentile_change_plot <- ggplot(income_change_percentiles, aes(x = income_percentile_20, y = income_change_from_policy)) +
   geom_line(color = "#572dff") +
   theme_bw() +
   scale_y_continuous(labels=scales::dollar_format()) +
+  scale_x_continuous(breaks = seq(0,100,10), labels = seq(0,100,10)) +
     theme(plot.title = element_text(hjust = 0.5),
         text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
         panel.grid.minor = element_blank(),
@@ -235,7 +294,8 @@ income_percentile_change_plot <- ggplot(income_change_percentiles, aes(x = incom
         plot.background = element_rect(fill="#fffdfc"),
         plot.margin=unit(c(.15,.75,.15,.15),"cm")) +
   labs(y = "Average\nChange\nin\nIncome", x = "Pre-Policy Income Percentile", 
-       title = "Average Increase in Income From EITC Reform\nBy Pre-Policy Income Rank")
+       title = "Average Increase in Income From EITC Reform\nBy Pre-Policy Income Rank",
+       caption = "Jain Family Institute")
 ```
 
 
@@ -245,14 +305,15 @@ income_percentile_change_plot
 
 Should do analysis for different groups, e.g. number of children (that's a HH thing), labor force status, race, more?
 
+
 ```{r, include =FALSE}
 test <- ipum %>% filter(labforce!=0 & age>24 & age <65) %>% #prime age labor force or some shit, need to look up the definition
   mutate(labor_force=ifelse(labforce==1,"Not In Labor Force",
-                            ifelse(labforce==2,"In Labor Force",NA)),
-         income_percentile_20=ntile(inctot,20),
-         income_percentile_20=income_percentile_20*5) %>% 
+                            ifelse(labforce==2,"In Labor Force",NA))) %>% 
   group_by(income_percentile_20,labor_force) %>% #Made this to 20 but should just group 1-5, 6-10 etc.
-  summarise(income_change_from_policy=mean(diff_aftertax_income_family))
+  summarise(income_change_from_policy=mean(diff_aftertax_income_family, na.rm=TRUE))
+
+#Doesn't really make sense to do this by income percentile for in labor force vs. out of labor force
 
 ggplot(test, aes(x = income_percentile_20, y = income_change_from_policy, group = labor_force)) +
   geom_line(aes(color=as.factor(labor_force))) + #Find complementary colors
@@ -271,8 +332,35 @@ ggplot(test, aes(x = income_percentile_20, y = income_change_from_policy, group 
        caption = "Prime Age Workers Only")
 ```
 
+
+## Cost of Reform
+
+I think the "total tax revenue" is probably way off due to CPS not being representative of top incomes, so probably should just say the cost rather than including this table with the overall numbers. (The cost difference should be pretty accurate because all the changes are with the low income filers)
+```{r, include = FALSE}
+#No idea if this is the correct variable/exactly how to do this
+cost_table <- ipum %>% summarise(total_tax_rev_status_quo=sum(status_quo_iitax*spmwt, na.rm=TRUE),
+                   total_tax_rev_reform=sum(reform_iitax*spmwt, na.rm=TRUE)) %>% 
+  mutate(cost_of_reform=total_tax_rev_reform-total_tax_rev_status_quo) %>% 
+  mutate(across(where(is.numeric), ~ .x/1000000000)) %>% 
+  mutate(across(where(is.numeric), round, 0)) %>% 
+  mutate(across(where(is.numeric), ~str_prefix(.x,"$"))) %>% 
+  rename(`Status Quo Tax Revenue` = total_tax_rev_status_quo,
+         `Total Tax Revenue Reform` = total_tax_rev_reform,
+         `Cost of Reform` = cost_of_reform)
+```
+
+```{r, echo=FALSE}
+cost_table %>%
+  kbl() %>%
+  kable_minimal() %>% 
+  kable_styling(html_font = "Unna",
+                full_width = FALSE,
+                position = "center") %>% 
+  footnote(general = "Cost in Billions of Dollars",
+           footnote_as_chunk = TRUE) 
+```
 <!-- ## Analysis of how non-filing reduces benefits?  -->
 
-Also need to look at policy with CTC and other stuff recently passed
+<!-- Also need to look at policy with CTC and other stuff recently passed -->
 
 

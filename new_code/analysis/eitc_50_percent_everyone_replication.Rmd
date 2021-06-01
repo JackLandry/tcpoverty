@@ -92,19 +92,21 @@ ipum <- ipum %>% mutate(spm1 = spmtotres < spmthresh,
 ```{r, include=FALSE}
 #Need to get the total HH numbers too
 #Need to round this whole thing, improve names, etc.
-tables_test <- ipum %>% summarise(
+overall_poverty <- ipum %>% summarise(
   spm1_mean = weighted.mean(spm1, spmwt),
   spm2_mean = weighted.mean(spm2, spmwt),
   out_of_spm_mean = weighted.mean(out_of_spm, spmwt))
-#Trying to do this for children, poverty is at the hh level, but data is at the individual level
-#So for children, measuring the reduction in the % of children whose HH are in poverty
+
 child_poverty <- ipum %>% filter(age<18) %>% summarise(
   spm1_mean = weighted.mean(spm1, spmwt),
   spm2_mean = weighted.mean(spm2, spmwt),
   out_of_spm_mean = weighted.mean(out_of_spm, spmwt)) 
-percent_poverty_reduction <- (tables_test$spm1_mean-tables_test$spm2_mean)/tables_test$spm2_mean
+percent_poverty_reduction <- (overall_poverty$spm1_mean-overall_poverty$spm2_mean)/overall_poverty$spm1_mean
 percent_poverty_reduction <- round(percent_poverty_reduction, 3)*100
-percentage_point_poverty_reduction <- round(tables_test$out_of_spm_mean, 3)*100
+percentage_point_poverty_reduction <- round(overall_poverty$out_of_spm_mean, 3)*100
+child_poverty <- child_poverty %>% mutate(Group="Children")
+overall_poverty <- overall_poverty %>% mutate(Group="Overall")
+tables_test <- bind_rows(overall_poverty,child_poverty)
 tables_test <- tables_test %>% rename(`Status Quo Poverty` = spm1_mean,
                        `EITC Reform Poverty` = spm2_mean,
                        `Poverty Reduction` = out_of_spm_mean
@@ -115,7 +117,8 @@ tables_test <- tables_test %>%
   mutate(across(where(is.numeric), round, 3)) %>% 
   mutate(across(where(is.numeric), ~ .x*100)) %>% 
   mutate(across(where(is.numeric),as.character)) %>% 
-  mutate(across(where(is.character), ~str_suffix(.x,"%")))
+  mutate(across(`Status Quo Poverty`:`Poverty Reduction`, ~str_suffix(.x,"%"))) %>% 
+  relocate(Group)
   
 
 ```
@@ -124,7 +127,9 @@ tables_test <- tables_test %>%
 <!-- Look at exsample here: https://www.jainfamilyinstitute.org/news/robust-evidence-for-1400-relief-and-recovery-checks/ -->
 ## Poverty Impacts of Expanded EITC
 
-Calculating changes in poverty from random changes to the EITC I made up. Want to add a column for catagory, and then add rows for overall, children, and more groups. Note that poverty measure is at the HH level, and most catagories would be at the individual level.
+Calculating changes in poverty from changing the status-quo EITC to start at 50% of max benefit for people with no labor income, replicating analysis from Ernie Tedeschi.
+
+
 
 ```{r, echo=FALSE}
 tables_test %>%
@@ -150,8 +155,23 @@ hhs_poverty_reform <- ipum %>%
   summarize(hhs_in_poverty = sum(spmwt)) %>% 
   filter(spm2==TRUE) %>% pull()
 
+hhs_children_poverty_status_quo <- ipum %>% 
+  filter(age<18) %>% 
+  group_by(spm1) %>%
+  summarize(hhs_in_poverty = sum(spmwt)) %>% 
+  filter(spm1==TRUE) %>% pull()
+
+hhs_children_poverty_reform <- ipum %>% 
+  filter(age<18) %>% 
+  group_by(spm2) %>%
+  summarize(hhs_in_poverty = sum(spmwt)) %>% 
+  filter(spm2==TRUE) %>% pull()
+
 num_of_hh_out_of_poverty <- hhs_poverty_status_quo-hhs_poverty_reform
 num_of_hh_out_of_poverty <- prettyNum(num_of_hh_out_of_poverty,big.mark=",",scientific=FALSE) #Making this display nicely
+
+num_of_hh_out_of_poverty_children <- hhs_children_poverty_status_quo-hhs_children_poverty_reform
+num_of_hh_out_of_poverty_children <- prettyNum(num_of_hh_out_of_poverty,big.mark=",",scientific=FALSE) #Making this display nicely
 ```
 This reform caused a `r num_of_hh_out_of_poverty[1]` household poverty reduction, a `r percent_poverty_reduction[1]`% decrease (a `r percentage_point_poverty_reduction[1]` percentage point reduction). 
 
