@@ -38,7 +38,7 @@ ipum <- ipum %>% mutate(across(c(momloc,poploc,sploc),
 
 ipum %>% count(sploc)
 ipum %>% count(pernum)
-ipum$
+
 #creating many new variabes
 ipum <- ipum %>% mutate(year_n1=year-1,
                 state=statefip,

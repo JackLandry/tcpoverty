@@ -95,7 +95,7 @@ ipum <- ipum %>% mutate(deep_poverty=spmthresh*.5,
                 baseline_deep_poverty=spmtotres < deep_poverty,
                 post_reform_deep_poverty=(spmtotres + diff_aftertax_income_family) < deep_poverty,
                 out_of_deep_poverty = ifelse((post_reform_deep_poverty == 0 & baseline_deep_poverty == 1),1,0),
-                out_of_poverty = ifelse(is.na(out_of_deep_poverty),0,out_of_deep_poverty)) 
+                out_of_deep_poverty = ifelse(is.na(out_of_deep_poverty),0,out_of_deep_poverty)) 
 
 
 
@@ -196,6 +196,7 @@ overall_poverty <- ipum %>% summarise(
   reform_poverty_reduction = weighted.mean(out_of_poverty, spmwt))
 #Trying to do this for children, poverty is at the hh level, but data is at the individual level
 #So for children, measuring the reduction in the % of children whose HH are in poverty
+#Need to set a function to filter for different groups
 child_poverty <- ipum %>% filter(age<18) %>% summarise(
   baseline_poverty_mean = weighted.mean(baseline_poverty, spmwt),
   reform_poverty_mean = weighted.mean(post_reform_poverty, spmwt),
@@ -214,7 +215,7 @@ child_deep_poverty <- ipum %>% filter(age<18) %>% summarise(
   reform_deep_poverty_reduction = weighted.mean(out_of_deep_poverty,spmwt)) %>% 
   mutate(Group = "Children")
 
-#Want to do more groups here
+#Want to do more groups here, so I should write a function
 
 
 percent_poverty_reduction <- (overall_poverty$baseline_poverty_mean-overall_poverty$reform_poverty_mean)/overall_poverty$baseline_poverty_mean

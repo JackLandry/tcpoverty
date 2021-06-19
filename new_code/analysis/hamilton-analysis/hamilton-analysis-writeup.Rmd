@@ -1,0 +1,273 @@
+---
+title: "Analysis of Institute on Race and Political Economy Guaranteed Income Proposal"
+author: "Jack Landry"
+date: "5/24/2021"
+output: html_document
+---
+
+<style type="text/css">
+body{
+  font-family: Unna;
+  font-size: 12pt;
+}
+/* Headers */
+h1,h2,h3,h4,h5,h6{
+  font-size: 20pt;
+  text-align: left;
+}
+
+h1.title {
+  font-size: 38px;
+  text-align: center;
+}
+h4.author { 
+    font-size: 18px;
+  text-align: center;
+}
+h4.date { 
+  font-size: 18px;
+  text-align: center;
+}
+</style>
+
+## Explination of Program
+
+1. *Single filers:* Benefit of $12,500, phase out starts at $10,000, ends at $50,000
+2. *Married/Cohabitating filers:* Benefit of $25,000, phase out starts at $15,000, ends at $70,000
+3. *Child benefit:* $4,500/child, no cap, same phase out structure as the main benefit.
+
+```{r, include=FALSE}
+library(tidyverse)
+reform_eitc_alt <- tibble(eitc = c(12500,12500,0,
+                                   17000,17000,0,
+                                   21500,21500,0,
+                                   26000,26000,0),
+                          labor_income = c(0,10000,50000,
+                                           0,10000,50000,
+                                           0,10000,50000,
+                                           0,10000,50000),
+                          group = c("0 Children","0 Children","0 Children",
+                                    "1 Child", "1 Child", "1 Child",
+                                    "2 Children", "2 Children", "2 Children",
+                                    "3+ Children","3+ Children","3+ Children")) #Unclear if the phase out threshold is different for children, I don't think it is
+reform_eitc_alt <- reform_eitc_alt %>% mutate(`EITC Type`="Guranteed Income EITC",
+                                              `Filing Status` = "Single",
+                                      group=str_c("Reform EITC: ", group))
+
+reform_eitc_alt_cohabitating <- tibble(eitc = c(25000,25000,0,
+                                   29500,29500,0,
+                                   34000,34000,0,
+                                   38500,38500,0),
+                          labor_income = c(0,15000,70000, #Does the start phase out change for cohabitating
+                                           0,15000,70000,
+                                           0,15000,70000,
+                                           0,15000,70000),
+                          group = c("0 Children","0 Children","0 Children",
+                                    "1 Child", "1 Child", "1 Child",
+                                    "2 Children", "2 Children", "2 Children",
+                                    "3+ Children","3+ Children","3+ Children")) #Unclear if the phase out threshold is different for children, I don't think it is
+reform_eitc_alt_cohabitating <- reform_eitc_alt_cohabitating %>% 
+  mutate(`EITC Type`="Guranteed Income EITC",
+         `Filing Status` = "Married/Cohabitating",
+         group=str_c("Reform EITC Married: ", group))
+#Wait it might be a different phase out for the child benefit amount and the regular benefit amount
+#The child benefit ends up at the same place, so I don't think so
+#For single, child benefit declines at rate of 11.25%, which is 4500
+#31.9% for main benefit, which is 12500 
+
+
+#Have to calculate the new stuff for the reform, maybe I should just make it for the reform I'm actually modeling
+original_eitc <- tibble(eitc = c(0,538,538,0,
+                                 0,3584,3584,0,
+                                 0,5920,5920,0,
+                                 0,6660,6660,0),
+                        labor_income = c(0,7030,8790,15820,
+                                         0,10540,19330,41756,
+                                         0,14800,19330,47440,
+                                         0,14800,19330,50954),
+                        group = c("0 Children","0 Children","0 Children","0 Children",
+                                  "1 Child", "1 Child", "1 Child","1 Child",
+                                  "2 Children", "2 Children", "2 Children","2 Children",
+                                  "3+ Children","3+ Children","3+ Children","3+ Children"))
+
+original_eitc_married <- tibble(eitc = c(0,538,538,0,
+                                 0,3584,3584,0,
+                                 0,5920,5920,0,
+                                 0,6660,6660,0),
+                        labor_income = c(0,7030,14680,21710,
+                                         0,10540,25220,47646,
+                                         0,14800,25220,53330,
+                                         0,14800,25220,56844),
+                        group = c("0 Children","0 Children","0 Children","0 Children",
+                                  "1 Child", "1 Child", "1 Child","1 Child",
+                                  "2 Children", "2 Children", "2 Children","2 Children",
+                                  "3+ Children","3+ Children","3+ Children","3+ Children"))
+
+original_eitc <- original_eitc %>% mutate(`EITC Type`="Original EITC",
+                                          `Filing Status` = "Single",
+                                          group=str_c("Original EITC: ", group))
+
+original_eitc_married <- original_eitc_married %>% mutate(`EITC Type`="Original EITC",
+                                                          `Filing Status` = "Married/Cohabitating",
+                                          group=str_c("Original EITC Married: ", group))
+
+
+
+
+
+
+combo_eitc <- bind_rows(original_eitc,original_eitc_married,reform_eitc_alt,reform_eitc_alt_cohabitating)
+combo_eitc
+hamilton_only <- bind_rows(reform_eitc_alt,reform_eitc_alt_cohabitating)
+# hamilton_only <- hamilton_only %>% mutate(group=str_remove(group,"Reform EITC: "),
+#                          group=str_remove(group,"Reform EITC Married: "))
+#Maybe do singles and married side by side, labeling the lines?
+color_for_plots <- "#572dff"
+
+singles <- ggplot(reform_eitc_alt, aes(x = labor_income, y = eitc, group = group)) +
+  geom_line(color = color_for_plots) + #Need to control colors so the old is gray
+  theme_bw() + 
+  labs(y = "Benefit  ", x = "\nLabor Income", 
+       title = "Singles") +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 10, limits = c(0,30000)) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+
+cohabitating <- ggplot(reform_eitc_alt_cohabitating, aes(x = labor_income, y = eitc, group = group)) +
+  geom_line(color = color_for_plots) + #Need to control colors so the old is gray
+  theme_bw() + 
+  labs(y = "Benefit  ", x = "\nAdjusted Gross Income", 
+       title = "Couples") +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 9) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+
+size_for_annotation <- 3
+singles <- singles + 
+  annotate("label", label = "0 Children", x = 5000, y = 14000, size = size_for_annotation, colour = color_for_plots,
+           family= "Unna") +
+  annotate("label", label = "1 Child", x = 5000, y = 18500, size = size_for_annotation, colour = color_for_plots,
+           family= "Unna") +
+  annotate("label", label = "2 Children", x = 5000, y = 23000, size = size_for_annotation, colour = color_for_plots,
+           family= "Unna") +
+  annotate("label", label = "3+ Children", x = 5000, y = 27500, size = size_for_annotation, colour = color_for_plots,
+           family= "Unna") 
+singles
+
+
+cohabitating <- cohabitating + 
+  annotate("label", label = "0 Children", x = 5000, y = 27000, size = size_for_annotation, colour = color_for_plots,
+           family= "Unna") +
+  annotate("label", label = "1 Child", x = 5000, y = 31500, size = size_for_annotation, colour = color_for_plots,
+           family= "Unna") +
+  annotate("label", label = "2 Children", x = 5000, y = 36000, size = size_for_annotation, colour = color_for_plots,
+           family= "Unna") +
+  annotate("label", label = "3+ Children", x = 5000, y = 40500, size = size_for_annotation, colour = color_for_plots,
+           family= "Unna") 
+cohabitating
+
+library(cowplot)
+
+library(patchwork)
+hamilton_by_kids <- (singles + cohabitating) +
+  plot_annotation(title = 'Guaranteed Income Benefit Size', theme = theme(plot.title = element_text(hjust = 0.5, size = 16), text=element_text(family="Unna")))
+
+
+
+#Need to get the legend going nicely
+guranteed_income_plot <- ggplot(combo_eitc, aes(x = labor_income, y = eitc, group = group, color = `EITC Type`, linetype=`Filing Status`)) +
+  geom_line() + #Need to control colors so the old is gray
+  scale_color_manual(values=c("#572dff","gray")) +
+  theme_bw() + 
+  labs(y = "EITC  \nBenefit  ", x = "\nLabor Income", 
+       title = "Guranteed Income\nEITC Benefit",
+       caption = "Jain Family Institute") +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 9) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+```
+
+```{r, echo=FALSE, fig.align="center", fig.width = 10, fig.height = 5, dpi = 300}
+hamilton_by_kids
+```
+
+The Hamilton proposal differs from the standard EITC in several ways. The most important change in the lack of phase in--Hamilton gives people with no taxable earnings the full benefit, while the standard EITC would give people nothing. Hamilton's program is also more generous, almost everyone will receive a larger benefit than the existing EITC. However, the benefits have a much more aggressive phase out relative to the standard EITC. The phase out are especially large families with more children--these families see a larger benefit but see the same phase in and phase out thresholds as people with no children, which necessitates a much steeper slope.
+
+```{r, echo=FALSE, fig.align="center", dpi = 300}
+guranteed_income_plot
+```
+
+
+## Explaining Hamilton Analysis Errors
+
+I estimate that if everyone eligible for the program received the full benefit they were entitled to, the program would cost \$1.4 trillion dollars.^[This uses data on incomes from 2019, the same year of analysis of the Hamilton program.] Hamilton estimates the program cost at \$876 billion dollars. This discrepancy is caused by several different facets of modeling assumptions, which I detail in the following sections. 
+
+### Phase out rates
+
+```{r, echo=FALSE}
+#Maybe try to make a table that reproduces their table 1
+```
+
+Hamilton writes that the phase out rate for singles is 31.9% and the phase out rate for couples is 46.4%. These proposed phase out rates are slightly inconsistent with how they describe the program rules. Take singles: with a benefit of \$12,500, a phase out that starts at \$10,000 and ends at \$50,000, the phase out rate should be 31.25%. This comes from the formula for calculating a slope. $$m 
+	= \frac{\Delta y}{\Delta x} 
+	= \frac{y_2 - y_1}{x_2 - x_1}
+	= \frac{12,500 - 0}{10,000 - 50,000}
+	= 31.25\%$$ 
+Similarly, the phase out for couples is $$m = \frac{\Delta y}{\Delta x} 
+	= \frac{y_2 - y_1}{x_2 - x_1}
+	= \frac{25,000 - 0}{15,000 - 70,000}
+	= 45.45\%$$ 
+The general benefit calculation is for people with a income between the phase out start and end points is $$benefit = max\_benefit - (income - phase\_out\_start) * phase\_out\_rate$$
+where the phase out rate comes from the calculation for the slope$$m 
+	= \frac{\Delta y}{\Delta x} 
+	= \frac{y_2 - y_1}{x_2 - x_1}
+	= \frac{max\_benefit - 0}{phase\_out\_start - phase\_out\_end}
+	= phase\_out\_rate$$
+The maximum benefit is either \$12,500 or \$25,000, depending on filing status, with the addition of $4,500 times the number of children in the household.
+
+These errors in calculating the phase out rate lead to small discrepencies in the benefit calculation of hypothetical households with $40,000 of income, shown in Hamilton's Table 1. Note that the benefit values in the table are also inconsistent with Hamilton's phase outs, but none of the errors are larger than X.
+
+Remake this table with a row for corrected values, maybe difference
+
+```{r, include = FALSE}
+library(tidyverse)
+library(tidylog)
+library(here)
+
+hamilton_singles <- read_rds(here("inter_data","singles_hamilton.rds"))
+
+hamilton_table <- tibble(`Refund Recepient` = c("Adult", "Child 1", "Child 2"),
+                          `Refund Amount Hamilton` = c(3269,1159,2318),
+                          `Refund Amont Corrected` = c())
+hamilton_couples <- read_rds(here("inter_data","couples_hamilton.rds"))
+```
+
+### Household Construction
+
+To model benefits and estimate cost, Hamilton uses the Survey of Consumer Finances (SCF) summary extract data. This is a commonly used, high-quality survey with detailed information on income and wealth. However, the summary extract have data on households, not individuals. For tax filing purposes (and how the Hamilton program is described), the only income data relevant is your personal income or your total income with a cohabitating partner. When there are multiple adult individuals in a household, they will often file taxes separately, while Hamilton determines eligibility based on their combined income.^[Hamilton describes a correction for households with three or more adults in the Appendix. I cannot replicate this analysis because as far as I can tell, there is no information in the SCF summary extract about the number of adult individuals in a household, only the number of children.] Since combined incomes are higher than individual incomes by construction, using household income to determine eligibility decreases the number of people who appear eligible and thus the estimated cost of the program.
+
+Details with numbers.
+
+### Adjusted Gross Income
+
+
+
+

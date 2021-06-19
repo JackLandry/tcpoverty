@@ -1,0 +1,434 @@
+---
+title: "ABC Act Analysis"
+author: "Jack Landry"
+date: "6/22/2021"
+output: html_document
+---
+
+<style type="text/css">
+body{
+  font-family: Unna;
+  font-size: 12pt;
+}
+/* Headers */
+h1,h2,h3,h4,h5,h6{
+  font-size: 20pt;
+  text-align: center;
+}
+
+h1.title {
+  font-size: 38px;
+  text-align: center;
+}
+h4.author { 
+    font-size: 18px;
+  text-align: center;
+}
+h4.date { 
+  font-size: 18px;
+  text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE}
+#Not sure i
+library(tidyverse)
+library(ipumsr)
+library(tidylog)
+library(kableExtra)
+library(stringr.tools)
+library(here)
+here()
+#Tax units sent to calculator
+ids <- read_csv(here("outputs","ids.csv")) 
+#New policy results file
+new_policy <- read_csv(here("tax-calculator-outputs","abc-act-reform-taxable.csv"))
+#Status quo policy results file
+status_quo_poicy <- read_csv(here("tax-calculator-code","c17_taxsim-17-#-#-#.csv"))
+
+#Need to change this to keep all these output variabes, but add a prefix or something
+names(new_policy) <- paste("reform", names(new_policy), sep = "_")
+
+# new_policy <- new_policy %>% rename(new_pol_aftertax_income=raftertax_income)
+names(status_quo_poicy) <- paste("status_quo", names(status_quo_poicy), sep = "_")
+# status_quo_poicy <- status_quo_poicy %>%
+#   rename(stats_quo_pol_aftertax_income=aftertax_income)
+
+combo_data <- ids %>% left_join(status_quo_poicy, by = c("RECID" = "status_quo_RECID")) %>% 
+  left_join(new_policy, by = c("RECID" = "reform_RECID"))
+combo_data <- combo_data %>% mutate(diff_aftertax_income=reform_aftertax_income - status_quo_aftertax_income)
+
+#Now bring in CPS ASEC data raw data for analysis
+ddi <- read_ipums_ddi(here("cps_data","cps_00042.xml"))
+ipum <-  read_ipums_micro(ddi)
+names(ipum) <- tolower(names(ipum))
+
+
+#"Not every ASEC record became a tax unit, so make sure you keep master non-matches" (From Earnie)
+#So ASEC records that are not tax units had no change in income
+#Also, why didn't they become tax units???
+ipum <- ipum  %>% left_join(combo_data, by = c("serial","pernum"))
+
+
+
+```
+
+```{r, include=FALSE}
+#Need to adjust everything for inflation somewhere
+#Need to note what year of data I'm using and what tax year
+#Need to try to do inference somewhere
+ipum <- ipum %>% 
+  mutate(state_name = labelled::to_factor(ipum$statefip, levels = "labels")) 
+
+ipum <- ipum %>% mutate(no_aftertax_income=ifelse(is.na(diff_aftertax_income),1,0),
+                        diff_aftertax_income=ifelse(is.na(diff_aftertax_income),0,diff_aftertax_income)) 
+
+#Adding UBI
+ipum <- ipum %>% mutate(diff_aftertax_income=diff_aftertax_income+13000)
+#Need to be careful about how missings are treated, I think if they aren't in the tax data the change should be 0
+ipum <- ipum %>% group_by(spmfamunit) %>% 
+  mutate(diff_aftertax_income_family=sum(diff_aftertax_income)) %>% 
+  ungroup()
+
+#SPMTOTRES records the total economic resources of families and is used to construct the Supplemental Poverty Measure (SPM)
+#SPMTHRESH records the poverty threshold used to calculate the Supplemental Poverty Measure (SPM) for a family.
+
+#Poverty metrics
+ipum <- ipum %>% mutate(deep_poverty=spmthresh*.5,
+                baseline_poverty = spmtotres < spmthresh,
+                post_reform_poverty = (spmtotres + diff_aftertax_income_family) < spmthresh,
+                out_of_poverty = ifelse((post_reform_poverty == 0 & baseline_poverty == 1),1,0),
+                out_of_poverty = ifelse(is.na(out_of_poverty),0,out_of_poverty),
+                baseline_deep_poverty=spmtotres < deep_poverty,
+                post_reform_deep_poverty=(spmtotres + diff_aftertax_income_family) < deep_poverty,
+                out_of_deep_poverty = ifelse((post_reform_deep_poverty == 0 & baseline_deep_poverty == 1),1,0),
+                out_of_deep_poverty = ifelse(is.na(out_of_deep_poverty),0,out_of_deep_poverty)) 
+
+
+
+```
+
+The Automatic BOOST to Communities Act, or the ABC Act, gives a total of \$13,000 to every person in the United States annually until the end of the Coronavirus crisis. ''Every person'' includes children (paid though who claims them as a dependent) and undocumented immigrants. The benefit is destributed monthly, with an initally \$2,000 payment and $1,000 per month thereafter. This document assesses the bill's hypothetical impact on poverty and the income distribution using data from the Current Population Survey's Annual Social and Economic Supplement. 
+
+
+
+<!-- ```{r, echo=FALSE, fig.align="center"} -->
+<!-- eitc_plot -->
+<!-- ``` -->
+
+
+
+```{r, include=FALSE}
+#Making functions to get poverty by different groups
+poverty_by_group_filter <- function(group) {
+ipum %>% filter({{ group }}==1) %>% summarise(
+  baseline_poverty_mean = weighted.mean(baseline_poverty, spmwt),
+  reform_poverty_mean = weighted.mean(post_reform_poverty, spmwt),
+  reform_poverty_reduction = weighted.mean(out_of_poverty, spmwt),
+  baseline_deep_poverty_mean = weighted.mean(baseline_deep_poverty,spmwt),
+  reform_deep_poverty_mean = weighted.mean(post_reform_deep_poverty,spmwt),
+  reform_deep_poverty_reduction = weighted.mean(out_of_deep_poverty,spmwt)) 
+}
+poverty_by_group <- function(group) {
+ipum %>% group_by({{ group }}) %>% summarise(
+  baseline_poverty_mean = weighted.mean(baseline_poverty, spmwt),
+  reform_poverty_mean = weighted.mean(post_reform_poverty, spmwt),
+  reform_poverty_reduction = weighted.mean(out_of_poverty, spmwt),
+  baseline_deep_poverty_mean = weighted.mean(baseline_deep_poverty,spmwt),
+  reform_deep_poverty_mean = weighted.mean(post_reform_deep_poverty,spmwt),
+  reform_deep_poverty_reduction = weighted.mean(out_of_deep_poverty,spmwt)) 
+}
+
+#Making variables to calculate poverty rates over
+ipum <- ipum %>% mutate(child=ifelse(age<18,1,0),
+                                     everyone=1)
+#Ignoring multi-racial here
+ipum <- ipum %>% mutate(race_bin=ifelse(race==100 & hispan==0,"White",
+                                ifelse(race==200 & hispan==0,"Black",
+                                ifelse(race==651 & hispan==0,"Asian",
+                                ifelse(race==100 & hispan!=0,"Hispanic","Other")))))
+
+ipum <- ipum %>% mutate(employment_status=ifelse(empstat<10,NA,
+                                         ifelse(empstat>=10 & empstat<=12,"Has Job",
+                                                ifelse(empstat>=21 & empstat<=22,"Unenployed",
+                                                       ifelse(empstat==32, "Unable to work",
+                                                              ifelse(empstat==36, "Retired",NA))))))
+#Household size
+spm_fam_unit_size_df <- ipum %>% group_by(spmfamunit) %>% count() %>% rename(spm_fam_unit_size=n)
+
+ipum <- ipum %>% left_join(spm_fam_unit_size_df)
+ipum %>% group_by(spm_fam_unit_size) %>% count() #Need to cut it off at a certain size
+ipum <- ipum %>% mutate(spm_fam_unit_size_cap=ifelse(spm_fam_unit_size>=8,8,spm_fam_unit_size),
+                spm_fam_unit_size_cap=as.character(spm_fam_unit_size_cap),
+                spm_fam_unit_size_cap=ifelse(spm_fam_unit_size_cap==8,"8+",spm_fam_unit_size_cap))
+
+#Maybe I can do a function for grouping rather than just filtering
+child_poverty <- poverty_by_group_filter(child) %>% mutate(Group = "Children")
+overall_poverty <- poverty_by_group_filter(everyone) %>% mutate(Group = "Overall")
+poverty_by_race <- poverty_by_group(race_bin)
+poverty_by_race <- poverty_by_race %>% rename(Group=race_bin)
+poverty_by_employment_status <- poverty_by_group(employment_status)
+poverty_by_fam_unit_size <- poverty_by_group(spm_fam_unit_size_cap)
+
+#Function to make nice tables
+table_maker <- function(dataframe,group_var,group_name) {
+dataframe %>% rename(`Status Quo Poverty` = baseline_poverty_mean,
+                       `Reform Poverty` = reform_poverty_mean,
+                       `Poverty Reduction` = reform_poverty_reduction,
+                       `Status Quo Deep Poverty` = baseline_deep_poverty_mean,
+                       `Reform Deep Poverty` = reform_deep_poverty_mean,
+                       `Deep Poverty Reduction` = reform_deep_poverty_reduction,
+                       {{group_name}} := {{group_var}}) %>% 
+  mutate(across(where(is.numeric), round, 3)) %>% 
+  mutate(across(where(is.numeric), ~ .x*100)) %>% 
+  mutate(across(where(is.numeric),as.character)) %>% 
+  mutate(across(`Status Quo Poverty`:`Deep Poverty Reduction`, ~str_suffix(.x,"%"))) %>% 
+  relocate({{group_name}})
+
+}
+#Applying function and a bit of manual cleanu
+poverty_by_fam_unit_size <- table_maker(poverty_by_fam_unit_size,spm_fam_unit_size_cap,`Family Size`)
+
+combo_poverty <- bind_rows(overall_poverty,child_poverty,poverty_by_race) 
+combo_poverty <- table_maker(combo_poverty,Group,Group)
+poverty_by_employment_status <- table_maker(poverty_by_employment_status,employment_status,`Employment Status`)
+poverty_by_employment_status <- poverty_by_employment_status %>% filter(!is.na(`Employment Status`))
+#Lets do overall, children, and race in one table, employment status in another table, and fam unit size in another?
+#Maybe I should make some graphs here... Like maybe arrows showing poverty reductions
+
+
+#Might be interesting to show how this can mute poverty impacts in a recession, e.g look over time
+#Who are the remaining poor people... mostly negative total resource measure under status quo, also need to look more into how the threshold is calculated
+# ipum %>% filter(post_reform_poverty==1) %>% select(inctot,diff_aftertax_income,diff_aftertax_income_family,spmthresh,spmtotres)
+
+#Need to make sure this is still correct
+percent_poverty_reduction <- (overall_poverty$baseline_poverty_mean-overall_poverty$reform_poverty_mean)/overall_poverty$baseline_poverty_mean
+
+percent_poverty_reduction <- round(percent_poverty_reduction, 3)*100
+percentage_point_poverty_reduction <- round(overall_poverty$reform_poverty_reduction, 3)*100
+```
+<!-- Calculating changes in poverty, want to make these nice tables -->
+<!-- Want to change the html to mimic Jain style as much as possible -->
+<!-- Look at example here: https://www.jainfamilyinstitute.org/news/robust-evidence-for-1400-relief-and-recovery-checks/ -->
+
+
+
+## Poverty Impacts of the ABC Act By Group
+
+
+```{r, include=FALSE}
+#Exploring the people who are still poor after the refuorm
+post_reform_poor <- ipum %>% filter(post_reform_poverty==1)
+ggplot(post_reform_poor, aes(x = spmthresh)) +
+  geom_histogram()
+#Unclear what's going on here
+ggplot(post_reform_poor, aes(x = status_quo_aftertax_income)) +
+  geom_histogram()
+```
+
+
+
+```{r, echo=FALSE}
+combo_poverty %>%
+  kbl() %>%
+  kable_minimal() %>% 
+  kable_styling(html_font = "Unna",
+                full_width = FALSE,
+                position = "center")
+```
+
+```{r, echo=FALSE}
+poverty_by_employment_status %>% 
+  kbl() %>% 
+  kable_minimal() %>% 
+  kable_styling(html_font = "Unna",
+                full_width = FALSE,
+                position = "center")
+```
+
+```{r, echo=FALSE}
+poverty_by_fam_unit_size %>% 
+  kbl() %>% 
+  kable_minimal() %>% 
+  kable_styling(html_font = "Unna",
+                full_width = FALSE,
+                position = "center")
+
+
+```
+
+```{r, include=FALSE}
+#Getting number of HHs in poverty or whatever
+#https://cran.r-project.org/web/packages/ipumsr/vignettes/ipums-cps.html
+hhs_poverty_status_quo <- ipum %>% 
+  group_by(baseline_poverty) %>%
+  summarize(hhs_in_poverty = sum(spmwt)) %>% 
+  filter(baseline_poverty==TRUE) %>% pull()
+hhs_poverty_reform <- ipum %>% 
+  group_by(post_reform_poverty) %>%
+  summarize(hhs_in_poverty = sum(spmwt)) %>% 
+  filter(post_reform_poverty==TRUE) %>% pull()
+
+num_of_hh_out_of_poverty <- hhs_poverty_status_quo-hhs_poverty_reform
+num_of_hh_out_of_poverty <- prettyNum(num_of_hh_out_of_poverty,big.mark=",",scientific=FALSE) #Making this display nicely
+```
+Overall, the ABC Act would cause a `r num_of_hh_out_of_poverty[1]` household poverty reduction, a `r percent_poverty_reduction[1]`% decrease (a `r percentage_point_poverty_reduction[1]` percentage point reduction). 
+
+
+
+## ABC Act's Distributional Impact
+
+The ABC ACT disproportunatly increases the income of low income families, even though there is no means testing or phase out. The mechanism for this effect is family size. Low income families are on average larger, so they see a larger benefit on average.
+
+```{r, include = FALSE}
+#Need to be careful, this is not a cleaned CPS, for analysis of other variables I need to clean stuff
+ipum <- ipum %>% mutate(total_income=ifelse(inctot==999999999,NA,inctot),
+                        income_percentile=ntile(total_income,100),
+                        income_percentile_20=ntile(total_income,20),
+                        income_percentile_20=income_percentile_20*5) 
+#Why are these numbers so big
+ipum %>% select(diff_aftertax_income_family,income_percentile_20,spm_fam_unit_size) #Why is income percentile NA sometimes
+#How about adding some cofidence bands to this sucker
+#Could use the survey package, maybe better myself?
+income_change_percentiles <- ipum %>% group_by(income_percentile_20) %>% 
+  summarise(income_change_from_policy=mean(diff_aftertax_income_family), #This should be weighted mean anyway
+            spm_family_size_mean=mean(spm_fam_unit_size))
+```
+
+```{r, include = FALSE}
+library(srvyr)
+ipum_spmwt <- ipum %>%
+   as_survey_design(weights = spmwt)
+income_change_percentiles_ci <- ipum_spmwt %>% group_by(income_percentile_20) %>% 
+  summarise(income_change_from_policy=survey_mean(diff_aftertax_income_family, vartype = "ci"), #This should be weighted mean anyway
+            spm_family_size_mean=survey_mean(spm_fam_unit_size, vartype = "ci"))
+
+
+#Need to figure out how the family unit stuff works
+# income_change_percentiles_no_children <- ipum %>% filter() %>% 
+#   group_by(income_percentile) %>% 
+#   summarise(income_change_from_policy=mean(diff_aftertax_income_family))
+```
+
+
+
+```{r, include = FALSE}
+income_percentile_change_plot <- ggplot(income_change_percentiles_ci, aes(x = income_percentile_20, y = income_change_from_policy)) +
+  geom_line(color = "#572dff") +
+  geom_path(color = "#572dff") +
+  geom_ribbon(aes(ymin=income_change_from_policy_low, ymax=income_change_from_policy_upp), linetype=2, alpha=0.2) +
+  theme_bw() +
+  scale_y_continuous(labels=scales::dollar_format(), breaks = seq(0,60000,15000), limits = c(0, 60000)) + #Breaks and labels with scales oh my
+  scale_x_continuous(breaks = seq(0,100,10), labels = seq(0,100,10)) +
+    theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) +
+  labs(y = "Average\nChange\nin\nIncome", x = "Pre-Policy Income Percentile", 
+       title = "Average Increase in Income From ABC Act\nBy Pre-Policy Income Rank",
+       caption = "Jain Family Institute")
+
+family_size_by_income <- ggplot(income_change_percentiles_ci, aes(x = income_percentile_20, y = spm_family_size_mean)) +
+  geom_line(color = "#572dff") +
+    geom_path(color = "#572dff") +
+  geom_ribbon(aes(ymin=spm_family_size_mean_low, ymax=spm_family_size_mean_upp), linetype=2, alpha=0.2) +
+  theme_bw() +
+  scale_y_continuous(labels = seq(0,5,1), breaks = seq(0,5,1), limits = c(0,5)) +
+  scale_x_continuous(breaks = seq(0,100,10), labels = seq(0,100,10)) +
+    theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) +
+  labs(y = "Average\nFamily\nSize", x = "Pre-Policy Income Percentile", 
+       title = "Average Family Size \nBy Pre-Policy Income Rank",
+       caption = "Jain Family Institute")
+
+```
+
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, fig.align="center"}
+income_percentile_change_plot
+```
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, fig.align="center"}
+family_size_by_income
+```
+
+
+
+```{r, include =FALSE}
+test <- ipum %>% filter(labforce!=0 & age>24 & age <65) %>% #prime age labor force or some shit, need to look up the definition
+  mutate(labor_force=ifelse(labforce==1,"Not In Labor Force",
+                            ifelse(labforce==2,"In Labor Force",NA))) %>% 
+  group_by(income_percentile_20,labor_force) %>% #Made this to 20 but should just group 1-5, 6-10 etc.
+  summarise(income_change_from_policy=mean(diff_aftertax_income_family, na.rm=TRUE))
+
+#Doesn't really make sense to do this by income percentile for in labor force vs. out of labor force
+
+ggplot(test, aes(x = income_percentile_20, y = income_change_from_policy, group = labor_force)) +
+  geom_line(aes(color=as.factor(labor_force))) + #Find complementary colors
+  theme_bw() +
+  scale_y_continuous(labels=scales::dollar_format()) +
+    theme(plot.title = element_text(hjust = 0.5),
+        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
+        panel.grid.minor = element_blank(),
+        axis.title.y = element_text(angle=0, vjust = 0.5),
+        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+        plot.background = element_rect(fill="#fffdfc"),
+        plot.margin=unit(c(.15,.75,.15,.15),"cm")) +
+  guides(color=guide_legend("")) + 
+  labs(y = "Average\nChange\nin\nIncome", x = "Pre-Policy Income Percentile", 
+       title = "Average Increase in Income From EITC Reform\nBy Pre-Policy Income Rank And Labor Force Status",
+       caption = "Prime Age Workers Only")
+```
+
+
+## Cost of Reform
+
+<!-- I think the "total tax revenue" is probably way off due to CPS not being representative of top incomes, so probably should just say the cost rather than including this table with the overall numbers. (The cost difference should be pretty accurate because all the changes are with the low income filers) -->
+
+
+```{r, include = FALSE}
+#No idea if this is the correct variable/exactly how to do this
+total_cost_trillions <- ipum %>% summarise(total_cost=sum(diff_aftertax_income*spmwt, na.rm=TRUE)) %>% 
+  mutate(total_cost_trillions = total_cost/1000000000000,
+         total_cost_trillions = round(total_cost_trillions,4)) %>% 
+  select(total_cost_trillions)
+total_cost_trillions
+# cost_table <- ipum %>% summarise(total_tax_rev_status_quo=sum(status_quo_iitax*spmwt, na.rm=TRUE),
+#                    total_tax_rev_reform=sum(reform_iitax*spmwt, na.rm=TRUE)) %>% 
+#   mutate(cost_of_reform=total_tax_rev_reform-total_tax_rev_status_quo) %>% 
+#   mutate(across(where(is.numeric), ~ .x/1000000000)) %>% 
+#   mutate(across(where(is.numeric), round, 0)) %>% 
+#   mutate(across(where(is.numeric), ~str_prefix(.x,"$"))) %>% 
+#   rename(`Status Quo Tax Revenue` = total_tax_rev_status_quo,
+#          `Total Tax Revenue Reform` = total_tax_rev_reform,
+#          `Cost of Reform` = cost_of_reform)
+```
+
+Annually, the ABC act would cost approximately $`r total_cost_trillions[1]` trillion dollars. This assumes none of the benefit is taxable, and no one changes their behavior in response to the benefit (e.g. reducing labor supply).
+
+
+
+
+<!-- ```{r, echo=FALSE} -->
+<!-- cost_table %>% -->
+<!--   kbl() %>% -->
+<!--   kable_minimal() %>%  -->
+<!--   kable_styling(html_font = "Unna", -->
+<!--                 full_width = FALSE, -->
+<!--                 position = "center") %>%  -->
+<!--   footnote(general = "Cost in Billions of Dollars", -->
+<!--            footnote_as_chunk = TRUE)  -->
+<!-- ``` -->
+<!-- <!-- ## Analysis of how non-filing reduces benefits?  -->  
+
+<!-- Also need to look at policy with CTC and other stuff recently passed -->
+
+
