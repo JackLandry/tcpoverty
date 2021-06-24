@@ -127,7 +127,7 @@ color_for_plots <- "#572dff"
 singles <- ggplot(reform_eitc_alt, aes(x = labor_income, y = eitc, group = group)) +
   geom_line(color = color_for_plots) + #Need to control colors so the old is gray
   theme_bw() + 
-  labs(y = "Benefit  ", x = "\nLabor Income", 
+  labs(y = "Benefit  ", x = "\nAdjusted Gross Income", 
        title = "Singles") +
   scale_y_continuous(labels=scales::dollar_format(), n.breaks = 10, limits = c(0,30000)) +
   scale_x_continuous(labels=scales::dollar_format()) +
@@ -191,8 +191,8 @@ guranteed_income_plot <- ggplot(combo_eitc, aes(x = labor_income, y = eitc, grou
   geom_line() + #Need to control colors so the old is gray
   scale_color_manual(values=c("#572dff","gray")) +
   theme_bw() + 
-  labs(y = "EITC  \nBenefit  ", x = "\nLabor Income", 
-       title = "Guranteed Income\nEITC Benefit",
+  labs(y = "Benefit  ", x = "\nAdjusted Gross Income", 
+       title = "Guranteed Income Benefit\n Vs. Standard EITC",
        caption = "Jain Family Institute") +
   scale_y_continuous(labels=scales::dollar_format(), n.breaks = 9) +
   scale_x_continuous(labels=scales::dollar_format()) +
@@ -220,6 +220,13 @@ guranteed_income_plot
 
 I estimate that if everyone eligible for the program received the full benefit they were entitled to, the program would cost \$1.4 trillion dollars.^[This uses data on incomes from 2019, the same year of analysis of the Hamilton program.] Hamilton estimates the program cost at \$876 billion dollars. This discrepancy is caused by several different facets of modeling assumptions, which I detail in the following sections. 
 
+```{r, include = FALSE}
+median_income_change_hamilton <- 64742-59051
+median_income_change_hamilton
+```
+
+Although I estimate the Hamilton program is significantly more expensive than advertised, that does not necessarily mean that they underestimate the cost of eliminating poverty. The larger cost I estimate means that more benefits are going out the door. For instance, Hamilton estimates that the program will boost median family income by \$5,691, while my estimate is \$11,881.^[My estimate is of median family income measure on the individual level, e.g. weighted by family size. Need to check if Hamilton clarifies that.] If you change the program rules, it may be possible achieve the same poverty reductions with costs close to what Hamilton estimates.^[In practice, it might be impossible to achieve the same poverty impacts conditional on size due to difficulties targeting poor families with a tax code that emphasizes individual income.]
+
 ### Phase out rates
 
 ```{r, echo=FALSE}
@@ -243,31 +250,190 @@ where the phase out rate comes from the calculation for the slope$$m
 	= phase\_out\_rate$$
 The maximum benefit is either \$12,500 or \$25,000, depending on filing status, with the addition of $4,500 times the number of children in the household.
 
-These errors in calculating the phase out rate lead to small discrepencies in the benefit calculation of hypothetical households with $40,000 of income, shown in Hamilton's Table 1. Note that the benefit values in the table are also inconsistent with Hamilton's phase outs, but none of the errors are larger than X.
+These errors in calculating the phase out rate lead to small discrepancies in the benefit calculation of hypothetical households with $40,000 of income, shown in Hamilton's Table 1. Note that the benefit values in the table are also inconsistent with Hamilton's phase outs, but none of the errors are larger than \$500.
 
-Remake this table with a row for corrected values, maybe difference
+<!-- Should I add phase out's implied by their phase out percentages? -->
+
 
 ```{r, include = FALSE}
 library(tidyverse)
 library(tidylog)
+library(stringr.tools)
+library(kableExtra)
 library(here)
 
 hamilton_singles <- read_rds(here("inter_data","singles_hamilton.rds"))
+main_benefit <- hamilton_singles$hamilton_money[1]
+hamilton_singles <- hamilton_singles %>% 
+  mutate(hamilton_money=ifelse(hamilton_money!=main_benefit,hamilton_money-main_benefit,hamilton_money)) %>% 
+  mutate(`Corrected Refund Amount`=hamilton_money) %>% 
+  select(`Corrected Refund Amount`)
 
 hamilton_table <- tibble(`Refund Recepient` = c("Adult", "Child 1", "Child 2"),
-                          `Refund Amount Hamilton` = c(3269,1159,2318),
-                          `Refund Amont Corrected` = c())
+                         `Refund Amount Hamilton` = c(3269,1159,2318))
+hamilton_table <- bind_cols(hamilton_table,hamilton_singles) %>% mutate(Difference=`Refund Amount Hamilton`-`Corrected Refund Amount`)
+hamilton_table
+
+hamilton_table <- hamilton_table %>% mutate(across(where(is.numeric), round, 0)) %>% 
+  mutate(across(where(is.numeric),as.character)) %>% #What about comma insertion
+  mutate(across(`Refund Amount Hamilton`:Difference, ~prettyNum(.x,big.mark=",")))  %>% 
+  mutate(across(`Refund Amount Hamilton`:Difference, ~str_prefix(.x,"$"))) 
+
+
+#Note that they both get to claim the kid...
+hamilton_table_couples <- tibble(`Refund Recepient` = c("Couple", "Child 1", "Child 2"),
+                                 `Refund Amount Hamilton` = c(14048,2475,4958))
+
 hamilton_couples <- read_rds(here("inter_data","couples_hamilton.rds"))
+main_benefit_couples <- hamilton_couples$hamilton_money[1]
+main_benefit <- hamilton_singles$hamilton_money[1]
+hamilton_couples <- hamilton_couples %>% 
+  mutate(hamilton_money=ifelse(hamilton_money!=main_benefit_couples,hamilton_money-main_benefit_couples,hamilton_money)) %>% 
+  mutate(`Corrected Refund Amount`=hamilton_money) %>% 
+  select(`Corrected Refund Amount`)
+
+hamilton_table_couples <- bind_cols(hamilton_table_couples,hamilton_couples) %>% mutate(Difference=`Refund Amount Hamilton`-`Corrected Refund Amount`)
+hamilton_table_couples
+
+
+hamilton_table_couples <- hamilton_table_couples %>% mutate(across(where(is.numeric), round, 0)) %>% 
+  mutate(across(where(is.numeric),as.character)) %>% #What about comma insertion
+  mutate(across(`Refund Amount Hamilton`:Difference, ~prettyNum(.x,big.mark=",")))  %>% 
+  mutate(across(`Refund Amount Hamilton`:Difference, ~str_prefix(.x,"$"))) 
+
+```
+
+```{r, echo=FALSE}
+knitr::kable(hamilton_table, format = "html", 
+             caption = "<center><strong>Singles</strong></center>",
+             escape = FALSE) %>% 
+  kable_styling(html_font = "Unna",
+                full_width = FALSE,
+                position = "center")
+```
+
+```{r, echo=FALSE}
+knitr::kable(hamilton_table_couples, format = "html", 
+             caption = "<center><strong>Couples</strong></center>",
+             escape = FALSE) %>% 
+  kable_styling(html_font = "Unna",
+                full_width = FALSE,
+                position = "center")
 ```
 
 ### Household Construction
 
-To model benefits and estimate cost, Hamilton uses the Survey of Consumer Finances (SCF) summary extract data. This is a commonly used, high-quality survey with detailed information on income and wealth. However, the summary extract have data on households, not individuals. For tax filing purposes (and how the Hamilton program is described), the only income data relevant is your personal income or your total income with a cohabitating partner. When there are multiple adult individuals in a household, they will often file taxes separately, while Hamilton determines eligibility based on their combined income.^[Hamilton describes a correction for households with three or more adults in the Appendix. I cannot replicate this analysis because as far as I can tell, there is no information in the SCF summary extract about the number of adult individuals in a household, only the number of children.] Since combined incomes are higher than individual incomes by construction, using household income to determine eligibility decreases the number of people who appear eligible and thus the estimated cost of the program.
+To model benefits and estimate cost, Hamilton uses the Survey of Consumer Finances (SCF) summary extract data. This is a commonly used, high-quality survey with detailed information on income and wealth. However, the summary extract have data on households, not individuals. For tax filing purposes (and how the Hamilton program is described), the only income data relevant is your personal income or your combined income with a cohabitating partner. When there are multiple adult individuals in a household, they will often file taxes separately based on their individual incomes, but Hamilton only has information on household combined income. Since combined incomes are higher than individual incomes by construction, using household income to determine eligibility decreases the number of people who appear eligible and thus the estimated cost of the program. In the appendix, Hamilton describes a correction for households with three or more adults:
 
-Details with numbers.
+> Finally, the SCF data also accounts for households with three or more adults, while the tax system only allows for single and two-adult filings. To estimate the economic effects of our program for households in the SCF data with three or more adults, we adopt a simplifying convention: households with three or more adults receive up to \$30,000 total for those households with income up to \$30,000, declining at a rate of 50 percent above \$30,000 to fully phase out at $80,000 in total household income across all adults. Because this category only represents a small proportion of total households, the choice of how to estimate the grant amounts for these households will not significantly affect the overall program cost. Under an alternative assumption that every non-married adult (with two or more adults in the household) file separately, that divides household income in a way that maximizes the refund value, our guaranteed income program cost still remains under \$1 trillion.
 
-### Adjusted Gross Income
+Add details about how this matters in practice with numbers.
+
+<!-- There is info on number of adults in the non-summary extract data -->
+
+<!-- I think this whole thing speaks to the difficulties of targeting only poor families without overhauling the tax code that mostly emphasizes individuals. There are a bunch of adults who have little taxable income in families that are not poor who receive income under this plan. Hamilton's family income based targeting doesn't give money to these people, but my individual level income data does.  -->
+
+
+### Adjusted Gross Income vs. Total Income
+
+To determine eligibility for the program, the Hamilton plan calls for using adjusted gross income (a.k.a taxable income). However, in their analysis of the SCF, they use a total income measure, which does not adjust for types of income that are not taxable. By construction, this income measure will increase people's measure income compare to their taxable income an underestimate eligability for the program.
+
+Add details using CPS
+
+## Analysis of Program
+
+### Poverty Impacts 
+
+### Average Tax Rate Analysis
+
+```{r, include = FALSE}
+mt_data <- read_rds(here("inter_data","mt_data_hamilton_for_analysis.Rds"))
 
 
 
+#Average tax rate singles
+singles_avg_hamilton <- ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6 & e00200>=5000), 
+       aes(x = e00200, y = tax_rate_hamilton_no_eitc, group = num_children_clean)) +
+  geom_line(aes(color=num_children_clean)) +
+  labs(y = "Average Tax Rate",
+       x = "Labor Income",
+       title = "Average Tax Rates for Single Filers\nHamilton Guaranteed Income Progam",
+       caption = "Jain Family Institute") +
+  scale_color_discrete(name = "Number of Children") +
+  theme_bw() +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 8) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+#Average tax rate coupes
+couples_avg_hamilton <- ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6 & e00200>=5000), 
+       aes(x = e00200, y = tax_rate_hamilton_no_eitc, group = num_children_clean)) +
+  geom_line(aes(color=num_children_clean)) +
+  labs(y = "Average Tax Rate",
+       x = "Labor Income",
+       title = "Average Tax Rates for Married Filers\nHamilton Guaranteed Income Progam",
+       caption = "Jain Family Institute") +
+  scale_color_discrete(name = "Number of Children") +
+  theme_bw() +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 8) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+```
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, figures-avg-tax-hamilton, fig.show="hold", out.width="50%"}
+couples_avg_hamilton
+singles_avg_hamilton
+```
+
+
+### Marginal Tax Rate Analysis
+
+```{r, include=FALSE}
+mt_data <- read_rds(here("inter_data","mt_data_hamilton_for_analysis.Rds"))
+
+ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6), 
+       aes(x = e00200, y = marginal_tax_rate_hamilton_eitc)) +
+  geom_line() +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Marginal\nTax Rate",
+       x = "Income",
+       title = "Marginal Tax Rates for Single Filers\n") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 6) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+# ggsave(here("new_code","analysis","hamilton-analysis","plots","marginal_tax_rate_hamilton_no_eitc_singles.png"),
+#        width = 4, height = 2, units = "cm", dpi = 1000)
+
+
+ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6), 
+       aes(x = e00200, y = marginal_tax_rate_hamilton_no_eitc)) +
+  geom_line() +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Marginal\nTax Rate\nFor Additonal\n$100 Income",
+       x = "Income",
+       title = "Marginal Tax Rates for Married Filers\n",
+       caption = "Jain Family Institute") +
+  theme_bw() +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 8) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+```
+
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, figures-marginal-tax-hamilton, fig.show="hold", out.width="50%"}
+couples_marginal_tax_graph
+singles_marginal_tax_graph
+```
 

@@ -52,8 +52,8 @@ ipum <- ipum %>% mutate(hamilton_money=ifelse(total_personal_income>10000 & tota
                                               hamilton_benefit+hamilton_phaseout_amount,hamilton_money))
 
 
-singles_data <- ipum %>% filter(dummy_data==1 & spouse==1) %>% #Need to double spouses for the exsample
-  select(hamilton_benefit,total_personal_income,num_eitc_elig_children_single)
+singles_data <- ipum %>% filter(dummy_data==1 & single==1) %>% #Need to double spouses for the exsample
+  select(hamilton_money,total_personal_income,num_eitc_elig_children_single)
 
 write_rds(singles_data, here("inter_data","singles_hamilton.rds"))
 
@@ -121,7 +121,7 @@ ipum %>% filter(spmfamunit==9001 & age>=18) %>%
 ggplot(data = ipum %>% filter(spouse==1 & total_income_couple<=100000 & age>=18), 
        aes(x = total_income_couple, y = hamilton_money)) +
   geom_point(alpha = .1) +
-  labs(y = "Benefit", x = "Labor Income")
+  labs(y = "Benefit", x = "Total couple income")
 
 
 ggplot(data = ipum %>% filter(single==1 & total_personal_income<=100000 & age>=18), 
