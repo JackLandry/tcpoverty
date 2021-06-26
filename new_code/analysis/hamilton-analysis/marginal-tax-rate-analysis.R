@@ -141,7 +141,7 @@ write_rds(mt_data, here("inter_data","mt_data_hamilton_for_analysis.Rds"))
 
 
 
-
+#Marginal tax rate singles
 ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6), 
        aes(x = e00200, y = marginal_tax_rate_hamilton_eitc)) +
   geom_line() +
@@ -158,7 +158,7 @@ ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6),
 # ggsave(here("new_code","analysis","hamilton-analysis","plots","marginal_tax_rate_hamilton_no_eitc_singles.png"),
 #        width = 4, height = 2, units = "cm", dpi = 1000)
 
-
+#Margins tax rate couples
 ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6), 
        aes(x = e00200, y = marginal_tax_rate_hamilton_no_eitc)) +
   geom_line() +
@@ -195,6 +195,7 @@ ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6),
 #         plot.background = element_rect(fill="#fffdfc"),
 #         plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
 
+#Average tax rate singles
 ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6 & e00200>=5000), 
        aes(x = e00200, y = tax_rate_hamilton_no_eitc, group = num_children_clean)) +
   geom_line(aes(color=num_children_clean)) +
@@ -210,7 +211,7 @@ ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6 & e002
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
-
+#Average tax rate coupes
 ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6 & e00200>=5000), 
        aes(x = e00200, y = tax_rate_hamilton_no_eitc, group = num_children_clean)) +
   geom_line(aes(color=num_children_clean)) +
@@ -261,7 +262,22 @@ ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6),
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 
 
-
+ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6 & e00200>=5000), 
+                               aes(x = e00200, y = tax_rate_hamilton_no_eitc, group = num_children_clean)) +
+  geom_line(aes(color=num_children_clean)) +
+  labs(y = "Average Tax Rate",
+       x = "Labor Income",
+       title = "Average Tax Rates for Single Filers\nHamilton Guaranteed Income Progam\n",
+       caption = "Jain Family Institute") +
+  # scale_color_discrete(name = "Number of Children") +
+  scale_color_brewer(palette = "Set1", name = "Number of Children") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 8) +
+  scale_x_continuous(labels=scales::dollar_format(seq(from = 5000, to = 100000, by = 10000)),
+                     breaks=seq(from = 5000, to = 100000, by = 10000)) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 
 
 ###Graph for Steve

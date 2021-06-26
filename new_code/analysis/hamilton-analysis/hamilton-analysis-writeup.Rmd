@@ -36,8 +36,23 @@ h4.date {
 2. *Married/Cohabitating filers:* Benefit of $25,000, phase out starts at $15,000, ends at $70,000
 3. *Child benefit:* $4,500/child, no cap, same phase out structure as the main benefit.
 
+```{r, include = FALSE}
+#JFI theme for graphics
+theme_jfi <- function () { 
+  theme_bw(base_size=12, base_family="Unna") %+replace% 
+    theme(panel.grid.minor = element_blank(),
+          plot.title = element_text(hjust = 0.5),
+          axis.title.y = element_text(angle=0, vjust = 0.5),
+          panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+          plot.background = element_rect(fill="#fffdfc"),
+          plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+}
+
+```
+
 ```{r, include=FALSE}
 library(tidyverse)
+library(RColorBrewer)
 reform_eitc_alt <- tibble(eitc = c(12500,12500,0,
                                    17000,17000,0,
                                    21500,21500,0,
@@ -124,37 +139,38 @@ hamilton_only <- bind_rows(reform_eitc_alt,reform_eitc_alt_cohabitating)
 #Maybe do singles and married side by side, labeling the lines?
 color_for_plots <- "#572dff"
 
+
 singles <- ggplot(reform_eitc_alt, aes(x = labor_income, y = eitc, group = group)) +
   geom_line(color = color_for_plots) + #Need to control colors so the old is gray
   theme_bw() + 
-  labs(y = "Benefit  ", x = "\nAdjusted Gross Income", 
-       title = "Singles") +
-  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 10, limits = c(0,30000)) +
-  scale_x_continuous(labels=scales::dollar_format()) +
-  theme(plot.title = element_text(hjust = 0.5),
-        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
-        panel.grid.minor = element_blank(),
-        axis.title.y = element_text(angle=0, vjust = 0.5),
-        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
-        plot.background = element_rect(fill="#fffdfc"),
-        plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+  labs(y = "Benefit\nSize", x = "\nAdjusted Gross Income", 
+       title = "Singles\n") +
+  scale_y_continuous(labels=scales::dollar_format(seq(from = 0, to = 50000, by = 10000), accuracy = 1), 
+                     breaks = seq(from = 0, to = 50000, by = 10000), limits = c(0,50000)) +
+  scale_x_continuous(labels=scales::dollar_format(seq(from = 0, to = 50000, by = 5000), accuracy = 1), 
+                     breaks = seq(from = 0, to = 50000, by = 5000), limits = c(0,50000)) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 
 cohabitating <- ggplot(reform_eitc_alt_cohabitating, aes(x = labor_income, y = eitc, group = group)) +
   geom_line(color = color_for_plots) + #Need to control colors so the old is gray
   theme_bw() + 
-  labs(y = "Benefit  ", x = "\nAdjusted Gross Income", 
-       title = "Couples") +
-  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 9) +
-  scale_x_continuous(labels=scales::dollar_format()) +
-  theme(plot.title = element_text(hjust = 0.5),
-        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
-        panel.grid.minor = element_blank(),
-        axis.title.y = element_text(angle=0, vjust = 0.5),
-        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
-        plot.background = element_rect(fill="#fffdfc"),
-        plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+  labs(y = "Benefit\nSize", x = "\nAdjusted Gross Income", 
+       title = "Couples\n") +
+  scale_y_continuous(labels=scales::dollar_format(seq(from = 0, to = 45000, by = 5000), accuracy = 1), 
+                     breaks = seq(from = 0, to = 45000, by = 5000), limits = c(0,45000)) +
+  scale_x_continuous(labels=scales::dollar_format(seq(from = 0, to = 70000, by = 15000), accuracy = 1), 
+                     breaks = seq(from = 0, to = 70000, by = 15000), limits = c(0,70000)) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 
-size_for_annotation <- 3
+cohabitating
+
+size_for_annotation <- 2.5
 singles <- singles + 
   annotate("label", label = "0 Children", x = 5000, y = 14000, size = size_for_annotation, colour = color_for_plots,
            family= "Unna") +
@@ -162,7 +178,7 @@ singles <- singles +
            family= "Unna") +
   annotate("label", label = "2 Children", x = 5000, y = 23000, size = size_for_annotation, colour = color_for_plots,
            family= "Unna") +
-  annotate("label", label = "3+ Children", x = 5000, y = 27500, size = size_for_annotation, colour = color_for_plots,
+  annotate("label", label = "3 Children", x = 5000, y = 27500, size = size_for_annotation, colour = color_for_plots,
            family= "Unna") 
 singles
 
@@ -174,7 +190,7 @@ cohabitating <- cohabitating +
            family= "Unna") +
   annotate("label", label = "2 Children", x = 5000, y = 36000, size = size_for_annotation, colour = color_for_plots,
            family= "Unna") +
-  annotate("label", label = "3+ Children", x = 5000, y = 40500, size = size_for_annotation, colour = color_for_plots,
+  annotate("label", label = "3 Children", x = 5000, y = 40500, size = size_for_annotation, colour = color_for_plots,
            family= "Unna") 
 cohabitating
 
@@ -191,27 +207,21 @@ guranteed_income_plot <- ggplot(combo_eitc, aes(x = labor_income, y = eitc, grou
   geom_line() + #Need to control colors so the old is gray
   scale_color_manual(values=c("#572dff","gray")) +
   theme_bw() + 
-  labs(y = "Benefit  ", x = "\nAdjusted Gross Income", 
+  labs(y = "Benefit\nSize", x = "\nAdjusted Gross Income", 
        title = "Guranteed Income Benefit\n Vs. Standard EITC",
        caption = "Jain Family Institute") +
   scale_y_continuous(labels=scales::dollar_format(), n.breaks = 9) +
   scale_x_continuous(labels=scales::dollar_format()) +
-  theme(plot.title = element_text(hjust = 0.5),
-        text=element_text(family="Unna"), #Want to change this to Jain font, need to ask for it
-        panel.grid.minor = element_blank(),
-        axis.title.y = element_text(angle=0, vjust = 0.5),
-        panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
-        plot.background = element_rect(fill="#fffdfc"),
-        plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+  theme_jfi()
 ```
 
-```{r, echo=FALSE, fig.align="center", fig.width = 10, fig.height = 5, dpi = 300}
+```{r, echo=FALSE, fig.align="center", dpi = 300}
 hamilton_by_kids
 ```
 
 The Hamilton proposal differs from the standard EITC in several ways. The most important change in the lack of phase in--Hamilton gives people with no taxable earnings the full benefit, while the standard EITC would give people nothing. Hamilton's program is also more generous, almost everyone will receive a larger benefit than the existing EITC. However, the benefits have a much more aggressive phase out relative to the standard EITC. The phase out are especially large families with more children--these families see a larger benefit but see the same phase in and phase out thresholds as people with no children, which necessitates a much steeper slope.
 
-```{r, echo=FALSE, fig.align="center", dpi = 300}
+```{r, echo=FALSE, fig.align="center", out.width = "80%", dpi = 300}
 guranteed_income_plot
 ```
 
@@ -357,28 +367,32 @@ singles_avg_hamilton <- ggplot(data= mt_data %>% filter(couple_status=="Single" 
   geom_line(aes(color=num_children_clean)) +
   labs(y = "Average Tax Rate",
        x = "Labor Income",
-       title = "Average Tax Rates for Single Filers\nHamilton Guaranteed Income Progam",
+       title = "Average Tax Rates for Single Filers\nHamilton Guaranteed Income Progam\n",
        caption = "Jain Family Institute") +
-  scale_color_discrete(name = "Number of Children") +
-  theme_bw() +
+  # scale_color_discrete(name = "Number of Children") +
+  scale_color_brewer(palette = "Set1", name = "Number of Children") +
   scale_y_continuous(labels=scales::percent_format(), n.breaks = 8) +
-  scale_x_continuous(labels=scales::dollar_format()) +
+  scale_x_continuous(labels=scales::dollar_format(seq(from = 5000, to = 100000, by = 10000)),
+                     breaks=seq(from = 5000, to = 100000, by = 10000)) +
   theme_jfi() +
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+
 #Average tax rate coupes
 couples_avg_hamilton <- ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6 & e00200>=5000), 
        aes(x = e00200, y = tax_rate_hamilton_no_eitc, group = num_children_clean)) +
   geom_line(aes(color=num_children_clean)) +
   labs(y = "Average Tax Rate",
        x = "Labor Income",
-       title = "Average Tax Rates for Married Filers\nHamilton Guaranteed Income Progam",
+       title = "Average Tax Rates for Married Filers\nHamilton Guaranteed Income Progam\n",
        caption = "Jain Family Institute") +
-  scale_color_discrete(name = "Number of Children") +
-  theme_bw() +
+  # scale_color_discrete(name = "Number of Children") +
+  scale_color_brewer(palette = "Set1", name = "Number of Children") +
   scale_y_continuous(labels=scales::percent_format(), n.breaks = 8) +
-  scale_x_continuous(labels=scales::dollar_format()) +
+  scale_x_continuous(labels=scales::dollar_format(seq(from = 5000, to = 100000, by = 10000)),
+                     breaks=seq(from = 5000, to = 100000, by = 10000)) +
   theme_jfi() +
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
@@ -393,15 +407,18 @@ singles_avg_hamilton
 
 ### Marginal Tax Rate Analysis
 
-```{r, include=FALSE}
-mt_data <- read_rds(here("inter_data","mt_data_hamilton_for_analysis.Rds"))
+I should also plot pre tax vs. post tax income. 
 
-ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6), 
+```{r, include=FALSE}
+linesize <- 1.25
+line_trans <- .5
+
+singles_marginal_tax_graph <- ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6), 
        aes(x = e00200, y = marginal_tax_rate_hamilton_eitc)) +
-  geom_line() +
+  geom_line(size=linesize, alpha = line_trans) +
   facet_wrap(vars(num_children_clean)) +
   labs(y = "Marginal\nTax Rate",
-       x = "Income",
+       x = "Labor Income",
        title = "Marginal Tax Rates for Single Filers\n") +
   scale_y_continuous(labels=scales::percent_format(), n.breaks = 6) +
   scale_x_continuous(labels=scales::dollar_format()) +
@@ -413,16 +430,16 @@ ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6),
 #        width = 4, height = 2, units = "cm", dpi = 1000)
 
 
-ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6), 
+couples_marginal_tax_graph <- ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6), 
        aes(x = e00200, y = marginal_tax_rate_hamilton_no_eitc)) +
-  geom_line() +
+  geom_line(size=linesize, alpha = line_trans) +
   facet_wrap(vars(num_children_clean)) +
   labs(y = "Marginal\nTax Rate\nFor Additonal\n$100 Income",
-       x = "Income",
+       x = "Labor Income",
        title = "Marginal Tax Rates for Married Filers\n",
        caption = "Jain Family Institute") +
   theme_bw() +
-  scale_y_continuous(labels=scales::percent_format(), n.breaks = 8) +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 6) +
   scale_x_continuous(labels=scales::dollar_format()) +
   theme_jfi() +
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
@@ -433,7 +450,44 @@ ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6),
 
 
 ```{r, warning = FALSE, message = FALSE, echo=FALSE, figures-marginal-tax-hamilton, fig.show="hold", out.width="50%"}
-couples_marginal_tax_graph
 singles_marginal_tax_graph
+couples_marginal_tax_graph
 ```
 
+```{r, include = FALSE}
+linesize <- 1.25
+line_trans <- .5
+singles_posttax_hamilton_inc_graph <- ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6), 
+       aes(x = e00200, y = aftertax_hamilton_no_eitc)) +
+  geom_line(size=linesize, alpha = line_trans) +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Aftertax Income\nWith Hamilton Benefit",
+       x = "Labor Income",
+       title = "Pre vs- Post Tax Income for Single Filers\n") +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 6) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+couples_posttax_hamilton_inc_graph <- ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6), 
+       aes(x = e00200, y = aftertax_hamilton_no_eitc)) +
+  geom_line(size=linesize, alpha = line_trans) +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Aftertax Income\nWith Hamilton Benefit",
+       x = "Labor Income",
+       title = "Pre vs- Post Tax Income for Married Filers\n") +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 6) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+```
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, figures-posttax-inc-hamilton, fig.show="hold", out.width="50%"}
+singles_posttax_hamilton_inc_graph
+couples_posttax_hamilton_inc_graph
+```
