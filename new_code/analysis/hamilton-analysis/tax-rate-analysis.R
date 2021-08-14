@@ -111,3 +111,4 @@ ggplot(marginal_tax_rate, aes(x = income, y = 1-tax_rate)) +
        x = 'Adjusted Gross Income') +
   scale_y_continuous(labels=scales::percent_format(accuracy=1), limits = n.breaks = 12) 
   scale_x_continuous(labels=scales::dollar_format())
+  

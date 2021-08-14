@@ -145,10 +145,8 @@ singles <- ggplot(reform_eitc_alt, aes(x = labor_income, y = eitc, group = group
   theme_bw() + 
   labs(y = "Benefit\nSize", x = "\nAdjusted Gross Income", 
        title = "Singles\n") +
-  scale_y_continuous(labels=scales::dollar_format(seq(from = 0, to = 50000, by = 10000), accuracy = 1), 
-                     breaks = seq(from = 0, to = 50000, by = 10000), limits = c(0,50000)) +
-  scale_x_continuous(labels=scales::dollar_format(seq(from = 0, to = 50000, by = 5000), accuracy = 1), 
-                     breaks = seq(from = 0, to = 50000, by = 5000), limits = c(0,50000)) +
+  scale_y_continuous(labels=scales::dollar_format()) +
+  scale_x_continuous(labels=scales::dollar_format()) +
   theme_jfi() +
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
@@ -159,14 +157,17 @@ cohabitating <- ggplot(reform_eitc_alt_cohabitating, aes(x = labor_income, y = e
   theme_bw() + 
   labs(y = "Benefit\nSize", x = "\nAdjusted Gross Income", 
        title = "Couples\n") +
-  scale_y_continuous(labels=scales::dollar_format(seq(from = 0, to = 45000, by = 5000), accuracy = 1), 
-                     breaks = seq(from = 0, to = 45000, by = 5000), limits = c(0,45000)) +
-  scale_x_continuous(labels=scales::dollar_format(seq(from = 0, to = 70000, by = 15000), accuracy = 1), 
-                     breaks = seq(from = 0, to = 70000, by = 15000), limits = c(0,70000)) +
+  scale_y_continuous(labels=scales::dollar_format()) +
+  scale_x_continuous(labels=scales::dollar_format()) +
   theme_jfi() +
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+  # scale_y_continuous(labels=scales::dollar_format(seq(from = 0, to = 45000, by = 5000), accuracy = 1), 
+  #                    breaks = seq(from = 0, to = 45000, by = 5000), limits = c(0,45000)) +
+  # scale_x_continuous(labels=scales::dollar_format(seq(from = 0, to = 70000, by = 15000), accuracy = 1), 
+  #                    breaks = seq(from = 0, to = 70000, by = 15000), limits = c(0,70000)) +
 
 cohabitating
 
@@ -215,13 +216,13 @@ guranteed_income_plot <- ggplot(combo_eitc, aes(x = labor_income, y = eitc, grou
   theme_jfi()
 ```
 
-```{r, echo=FALSE, fig.align="center", dpi = 300}
+```{r, echo=FALSE, fig.align="center", out.width = "80%", dpi = 1000}
 hamilton_by_kids
 ```
 
 The Hamilton proposal differs from the standard EITC in several ways. The most important change in the lack of phase in--Hamilton gives people with no taxable earnings the full benefit, while the standard EITC would give people nothing. Hamilton's program is also more generous, almost everyone will receive a larger benefit than the existing EITC. However, the benefits have a much more aggressive phase out relative to the standard EITC. The phase out are especially large families with more children--these families see a larger benefit but see the same phase in and phase out thresholds as people with no children, which necessitates a much steeper slope.
 
-```{r, echo=FALSE, fig.align="center", out.width = "80%", dpi = 300}
+```{r, echo=FALSE, fig.align="center", out.width = "80%", dpi = 1000}
 guranteed_income_plot
 ```
 
@@ -348,6 +349,35 @@ Add details about how this matters in practice with numbers.
 
 To determine eligibility for the program, the Hamilton plan calls for using adjusted gross income (a.k.a taxable income). However, in their analysis of the SCF, they use a total income measure, which does not adjust for types of income that are not taxable. By construction, this income measure will increase people's measure income compare to their taxable income an underestimate eligability for the program.
 
+The authors of the Hamilton report are aware of this issue, and they [cite a report from IRS researchers](https://www.federalreserve.gov/Pubs/OSS/oss2/papers/johnsmoore.pdf) defending their choice. They quote the researchers saying that IRS data and SCF data "compare quite favorably", and that the "overall variance...between SCF and tax income data" is only 6\%. However, appears to be a misinterpretation of the report. The report compares the total of total income from all tax returns to the total of all income from the Survey of Consumer Finances after applying survey weights. Due to the household construction issue (see the above section) there are 25\% more tax returns filed that what would be implied by SCF data. Since the report uses the *total* of total income, the average of total income between the SCF and IRS data is very different. Moreover, this has little bearing on *taxable* income, and does not account for the (large) number of people who do not file taxes but would be eligable for the Hamilton program.
+
+```{r, include = FALSE}
+scf_avg_income <- 71620909358*1000/102825058
+
+irs_avg_income <- 67264906258*1000/129373500
+
+
+```
+
+<!-- As a result, IRS researchers have found that the two data sources “compare quite favorably,” -->
+<!-- particularly for the categories of income most commonly reported by lower and middle-income taxpayers, with an -->
+<!-- overall variance of only 6 percent between SCF and tax income data (Johnson & Moore, 2008). -->
+
+<!-- SCF total income measure -->
+<!--  > Household income for previous calendar year.  Inlcudes wages,  -->
+<!-- self-employment and business income, taxable and tax-exempt  -->
+<!-- interest, dividends, realized capital gains, food stamps and  -->
+<!-- other support programs provided by the government, pension income  -->
+<!-- and withdrawals from retirement accounts, Social Security income,  -->
+<!-- alimony and other support payments, and miscellaneous sources of  -->
+<!-- income. -->
+
+<!-- SCF used to ask for adjusted gross income, could try to comare in the 2001 data, maybe more recent: https://www.federalreserve.gov/econres/files/codebk2001.txt -->
+
+```{r}
+
+```
+
 Add details using CPS
 
 ## Analysis of Program
@@ -380,7 +410,7 @@ singles_avg_hamilton <- ggplot(data= mt_data %>% filter(couple_status=="Single" 
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 
 
-#Average tax rate coupes
+#Average tax rate couples
 couples_avg_hamilton <- ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6 & e00200>=5000), 
        aes(x = e00200, y = tax_rate_hamilton_no_eitc, group = num_children_clean)) +
   geom_line(aes(color=num_children_clean)) +
@@ -407,42 +437,59 @@ singles_avg_hamilton
 
 ### Marginal Tax Rate Analysis
 
-I should also plot pre tax vs. post tax income. 
+Does not include value of benefits (e.g SNAP, Medicaid) or any state/local taxes. 
 
 ```{r, include=FALSE}
 linesize <- 1.25
 line_trans <- .5
 
-singles_marginal_tax_graph <- ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6), 
-       aes(x = e00200, y = marginal_tax_rate_hamilton_eitc)) +
-  geom_line(size=linesize, alpha = line_trans) +
+mt_data_long_mt_rates <- mt_data %>% 
+  select(e00200,couple_status,num_children,num_children_clean,marginal_tax_rate_hamilton_no_eitc,marginal_tax_rate_hamilton_eitc,
+         marginal_tax_rate) %>% 
+  pivot_longer(cols = c(marginal_tax_rate_hamilton_no_eitc,marginal_tax_rate_hamilton_eitc,marginal_tax_rate),
+               names_to = "tax_rate_type",
+               values_to = "marginal_tax_rate")
+
+mt_data_long_mt_rates
+
+mt_data_long_mt_rates <- mt_data_long_mt_rates %>% 
+  mutate(tax_rate_type=ifelse(tax_rate_type=="marginal_tax_rate", "Status Quo",
+                              ifelse(tax_rate_type=="marginal_tax_rate_hamilton_no_eitc","Hamilton Reform\nEIC Repealed", 
+                                     ifelse(tax_rate_type=="marginal_tax_rate_hamilton_eitc","Hamilton Reform\nKeep EIC",NA))))
+
+```
+
+```{r, include=FALSE}
+singles_marginal_tax_graph <- ggplot(data= mt_data_long_mt_rates %>% filter(couple_status=="Single" & num_children!=6 & e00200!=0), 
+       aes(x = e00200, y = marginal_tax_rate, group = tax_rate_type)) +
+  geom_line(aes(color = tax_rate_type), size=linesize, alpha = line_trans) +
   facet_wrap(vars(num_children_clean)) +
-  labs(y = "Marginal\nTax Rate",
+  labs(y = "Marginal\nTax Rate\nFor Additonal\n$100 Income",
        x = "Labor Income",
        title = "Marginal Tax Rates for Single Filers\n") +
-  scale_y_continuous(labels=scales::percent_format(), n.breaks = 6) +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5, limits = c(-1,1.25), breaks = seq(-1,1,.5)) +
   scale_x_continuous(labels=scales::dollar_format()) +
   theme_jfi() +
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        legend.title = element_blank(),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
-# ggsave(here("new_code","analysis","hamilton-analysis","plots","marginal_tax_rate_hamilton_no_eitc_singles.png"),
-#        width = 4, height = 2, units = "cm", dpi = 1000)
 
 
-couples_marginal_tax_graph <- ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6), 
-       aes(x = e00200, y = marginal_tax_rate_hamilton_no_eitc)) +
-  geom_line(size=linesize, alpha = line_trans) +
+couples_marginal_tax_graph <- ggplot(data= mt_data_long_mt_rates %>% filter(couple_status=="Couple" & num_children!=6 & e00200!=0), 
+       aes(x = e00200, y = marginal_tax_rate, group = tax_rate_type)) +
+  geom_line(aes(color=tax_rate_type),size=linesize, alpha = line_trans) +
   facet_wrap(vars(num_children_clean)) +
   labs(y = "Marginal\nTax Rate\nFor Additonal\n$100 Income",
        x = "Labor Income",
        title = "Marginal Tax Rates for Married Filers\n",
        caption = "Jain Family Institute") +
   theme_bw() +
-  scale_y_continuous(labels=scales::percent_format(), n.breaks = 6) +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5, limits = c(-1,1.25), breaks = seq(-1,1,.5)) +
   scale_x_continuous(labels=scales::dollar_format()) +
   theme_jfi() +
-  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1, size = 8),
+        legend.title = element_blank(),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 
@@ -457,31 +504,53 @@ couples_marginal_tax_graph
 ```{r, include = FALSE}
 linesize <- 1.25
 line_trans <- .5
-singles_posttax_hamilton_inc_graph <- ggplot(data= mt_data %>% filter(couple_status=="Single" & num_children!=6), 
-       aes(x = e00200, y = aftertax_hamilton_no_eitc)) +
-  geom_line(size=linesize, alpha = line_trans) +
+
+
+
+#Want to do the same thing here, include current EITC
+mt_data_long_posttax_income <- mt_data %>% 
+  select(e00200,couple_status,num_children,num_children_clean,aftertax_hamilton_no_eitc,aftertax_hamilton_eitc,aftertax_income) %>% 
+  pivot_longer(cols = c(aftertax_hamilton_no_eitc,aftertax_hamilton_eitc,aftertax_income),
+               names_to = "aftertax_income_type",
+               values_to = "aftertax_income")
+
+
+mt_data_long_posttax_income <- mt_data_long_posttax_income %>% 
+  mutate(aftertax_income_type=ifelse(aftertax_income_type=="aftertax_income", "Status Quo",
+                                     ifelse(aftertax_income_type=="aftertax_hamilton_no_eitc","Hamilton Reform\nEIC Repealed", 
+                                            ifelse(aftertax_income_type=="aftertax_hamilton_eitc","Hamilton Reform\nKeep EIC",NA))))
+
+
+
+
+#Need to change the y axis to start at 0
+singles_posttax_hamilton_inc_graph <- ggplot(data= mt_data_long_posttax_income %>% filter(couple_status=="Single" & num_children!=6 & e00200!=0 & e00200<=60000), 
+       aes(x = e00200, y = aftertax_income, group = aftertax_income_type)) +
+  geom_line(aes(color = aftertax_income_type), size=linesize, alpha = line_trans) +
   facet_wrap(vars(num_children_clean)) +
-  labs(y = "Aftertax Income\nWith Hamilton Benefit",
+  labs(y = "Aftertax\nIncome\nWith\nHamilton\nBenefit",
        x = "Labor Income",
        title = "Pre vs- Post Tax Income for Single Filers\n") +
-  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 6) +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 6, limits = c(0,80000)) +
   scale_x_continuous(labels=scales::dollar_format()) +
   theme_jfi() +
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        legend.title = element_blank(),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 
-couples_posttax_hamilton_inc_graph <- ggplot(data= mt_data %>% filter(couple_status=="Couple" & num_children!=6), 
-       aes(x = e00200, y = aftertax_hamilton_no_eitc)) +
-  geom_line(size=linesize, alpha = line_trans) +
+couples_posttax_hamilton_inc_graph <- ggplot(data= mt_data_long_posttax_income %>% filter(couple_status=="Couple" & num_children!=6 & e00200!=0 & e00200<=80000), 
+       aes(x = e00200, y = aftertax_income, group = aftertax_income_type)) +
+  geom_line(aes(color = aftertax_income_type), size=linesize, alpha = line_trans) +
   facet_wrap(vars(num_children_clean)) +
-  labs(y = "Aftertax Income\nWith Hamilton Benefit",
+  labs(y = "Aftertax\nIncome\nWith\nHamilton\nBenefit",
        x = "Labor Income",
        title = "Pre vs- Post Tax Income for Married Filers\n") +
-  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 6) +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 6, limits = c(0,80000)) +
   scale_x_continuous(labels=scales::dollar_format()) +
   theme_jfi() +
   theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        legend.title = element_blank(),
         # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
         axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
 
@@ -491,3 +560,5 @@ couples_posttax_hamilton_inc_graph <- ggplot(data= mt_data %>% filter(couple_sta
 singles_posttax_hamilton_inc_graph
 couples_posttax_hamilton_inc_graph
 ```
+
+Another issues might be incentives to file jointly vs. as single for cohabitators/married... I think for some there'd be an incentive to file separately

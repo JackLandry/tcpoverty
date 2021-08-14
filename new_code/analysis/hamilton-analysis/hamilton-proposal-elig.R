@@ -40,9 +40,6 @@ ipum %>% filter(dummy_data==1 & single==1) %>% #Need to double spouses for the e
   select(hamilton_phaseout_percentage,hamilton_phaseout_amount,hamilton_benefit,total_personal_income,hamilton_money,num_eitc_elig_children_single)
 
 
-#Phaseout = (total_income-phaseout_start)*phaseout_rate
-#Phaseout rate should be depend on number of children, so I don't think I have the formula right... 
-#Need to review that
 ipum <- ipum %>% mutate(hamilton_phaseout_percentage=(12500+4500*num_eitc_elig_children_single)/-40000,
                         hamilton_phaseout_amount=(total_personal_income-10000)*hamilton_phaseout_percentage)
 
@@ -58,7 +55,7 @@ singles_data <- ipum %>% filter(dummy_data==1 & single==1) %>% #Need to double s
 write_rds(singles_data, here("inter_data","singles_hamilton.rds"))
 
 ipum <- ipum %>% filter(dummy_data!=1)
-#Exsample for spouses
+#Example for spouses
 ipum <- ipum %>% add_row(spouse=1, total_income_couple=40000, num_eitc_elig_children_two_parents=0, age=30, dummy_data=1) %>% 
   add_row(spouse=1, total_income_couple=40000, num_eitc_elig_children_two_parents=1, age=30, dummy_data=1) %>% 
   add_row(spouse=1, total_income_couple=40000, num_eitc_elig_children_two_parents=2, age=30, dummy_data=1)

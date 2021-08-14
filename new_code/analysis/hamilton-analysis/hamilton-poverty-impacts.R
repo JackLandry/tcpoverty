@@ -28,98 +28,213 @@ hamilton_analysis_data <- hamilton_analysis_data %>% group_by(spmfamunit) %>%
          diff_aftertax_income_family_no_hamilton=sum(aftertax_income_no_hamilton)) %>% 
   ungroup()
 
+#Creating poverty ranges
 hamilton_analysis_data <- hamilton_analysis_data %>% mutate(deep_poverty=spmthresh*.5,
                         baseline_poverty = spmtotres < spmthresh,
-                        post_reform_poverty = (spmtotres + diff_aftertax_income_family_hamilton) < spmthresh,
-                        out_of_poverty = ifelse((post_reform_poverty == 0 & baseline_poverty == 1),1,0),
-                        out_of_poverty = ifelse(is.na(out_of_poverty),0,out_of_poverty),
-                        baseline_deep_poverty=spmtotres < deep_poverty,
-                        post_reform_deep_poverty=(spmtotres + diff_aftertax_income_family_hamilton) < deep_poverty,
-                        out_of_deep_poverty = ifelse((post_reform_deep_poverty == 0 & baseline_deep_poverty == 1),1,0),
-                        out_of_deep_poverty = ifelse(is.na(out_of_deep_poverty),0,out_of_deep_poverty)) 
+                        baseline_poverty_2x = spmtotres < spmthresh*2,
+                        baseline_poverty_3x = spmtotres < spmthresh*3,
+                        baseline_poverty_1_2x = spmtotres > spmthresh & spmtotres < spmthresh*2,
+                        baseline_poverty_2_3x = spmtotres > spmthresh*2 & spmtotres < spmthresh*3,
+                        baseline_poverty_3_5x = spmtotres > spmthresh*3 & spmtotres < spmthresh*5,
+                        baseline_poverty_5x_plus = spmtotres > spmthresh*5)
 
+
+hamilton_analysis_data <- hamilton_analysis_data %>% mutate(
+                        post_reform_poverty = (spmtotres + diff_aftertax_income_family_hamilton) < spmthresh,
+                        post_reform_poverty_2x = (spmtotres + diff_aftertax_income_family_hamilton) < (spmthresh*2),
+                        post_reform_poverty_1_2x = ((spmtotres + diff_aftertax_income_family_hamilton) < (spmthresh*2)) &
+                          ((spmtotres + diff_aftertax_income_family_hamilton) >= (spmthresh)),
+                        post_reform_poverty_3x = (spmtotres + diff_aftertax_income_family_hamilton) < (spmthresh*3),
+                        post_reform_poverty_2_3x = ((spmtotres + diff_aftertax_income_family_hamilton) >= (spmthresh*2)) &
+                          ((spmtotres + diff_aftertax_income_family_hamilton) < (spmthresh*3)),
+                        post_reform_poverty_3_5x = ((spmtotres + diff_aftertax_income_family_hamilton) >= (spmthresh*3)) &
+                          ((spmtotres + diff_aftertax_income_family_hamilton) < (spmthresh*5)),
+                        post_reform_poverty_5x_plus =  ((spmtotres + diff_aftertax_income_family_hamilton) >= (spmthresh*5)))
+
+
+
+####writing new functions for hamilton.... 
+#need to do a summarise across
 poverty_by_group_filter <- function(group) {
-  hamilton_analysis_data %>% filter({{ group }}==1) %>% summarise(
-    baseline_poverty_mean = weighted.mean(baseline_poverty, spmwt),
-    reform_poverty_mean = weighted.mean(post_reform_poverty, spmwt),
-    reform_poverty_reduction = weighted.mean(out_of_poverty, spmwt),
-    baseline_deep_poverty_mean = weighted.mean(baseline_deep_poverty,spmwt),
-    reform_deep_poverty_mean = weighted.mean(post_reform_deep_poverty,spmwt),
-    reform_deep_poverty_reduction = weighted.mean(out_of_deep_poverty,spmwt)) 
-}
+  hamilton_analysis_data %>% filter({{ group }}==1) %>% 
+    summarise(across(baseline_poverty:post_reform_poverty_5x_plus, ~weighted.mean(.x,spmwt))) 
+  }
+
 poverty_by_group <- function(group) {
-  hamilton_analysis_data %>% group_by({{ group }}) %>% summarise(
-    baseline_poverty_mean = weighted.mean(baseline_poverty, spmwt),
-    reform_poverty_mean = weighted.mean(post_reform_poverty, spmwt),
-    reform_poverty_reduction = weighted.mean(out_of_poverty, spmwt),
-    baseline_deep_poverty_mean = weighted.mean(baseline_deep_poverty,spmwt),
-    reform_deep_poverty_mean = weighted.mean(post_reform_deep_poverty,spmwt),
-    reform_deep_poverty_reduction = weighted.mean(out_of_deep_poverty,spmwt)) 
+  hamilton_analysis_data %>% group_by({{ group }}) %>% 
+    summarise(across(baseline_poverty:post_reform_poverty_5x_plus, ~weighted.mean(.x,spmwt))) 
 }
+
 
 #Making variables to calculate poverty rates over
 hamilton_analysis_data <- hamilton_analysis_data %>% mutate(child=ifelse(age<18,1,0),
-                        everyone=1)
+                                                            everyone=1)
 #Ignoring multi-racial here
-hamilton_analysis_data <- hamilton_analysis_data %>% mutate(race_bin=ifelse(race==100 & hispan==0,"White",
-                                        ifelse(race==200 & hispan==0,"Black",
-                                               ifelse(race==651 & hispan==0,"Asian",
-                                                      ifelse(race==100 & hispan!=0,"Hispanic","Other")))))
+hamilton_analysis_data <- hamilton_analysis_data %>% 
+  mutate(race_bin=ifelse(race==100 & hispan==0,"White",
+                         ifelse(race==200 & hispan==0,"Black",
+                                ifelse(race==651 & hispan==0,"Asian",
+                                       ifelse(race==100 & hispan!=0,"Hispanic","Other")))))
 
-hamilton_analysis_data <- hamilton_analysis_data %>% mutate(employment_status=ifelse(empstat<10,NA,
-                                                 ifelse(empstat>=10 & empstat<=12,"Has Job",
-                                                        ifelse(empstat>=21 & empstat<=22,"Unenployed",
-                                                               ifelse(empstat==32, "Unable to work",
-                                                                      ifelse(empstat==36, "Retired",NA))))))
+hamilton_analysis_data <- hamilton_analysis_data %>% 
+  mutate(employment_status=ifelse(empstat<10,NA,
+                                  ifelse(empstat>=10 & empstat<=12,"Has Job",
+                                         ifelse(empstat>=21 & empstat<=22,"Unenployed",
+                                                ifelse(empstat==32, "Unable to work",
+                                                       ifelse(empstat==36, "Retired",NA))))))
 #Household size
 spm_fam_unit_size_df <- hamilton_analysis_data %>% group_by(spmfamunit) %>% count() %>% rename(spm_fam_unit_size=n)
 
 hamilton_analysis_data <- hamilton_analysis_data %>% left_join(spm_fam_unit_size_df)
 hamilton_analysis_data %>% group_by(spm_fam_unit_size) %>% count() #Need to cut it off at a certain size
 hamilton_analysis_data <- hamilton_analysis_data %>% mutate(spm_fam_unit_size_cap=ifelse(spm_fam_unit_size>=8,8,spm_fam_unit_size),
-                        spm_fam_unit_size_cap=as.character(spm_fam_unit_size_cap),
-                        spm_fam_unit_size_cap=ifelse(spm_fam_unit_size_cap==8,"8+",spm_fam_unit_size_cap))
+                                                            spm_fam_unit_size_cap=as.character(spm_fam_unit_size_cap),
+                                                            spm_fam_unit_size_cap=ifelse(spm_fam_unit_size_cap==8,"8+",spm_fam_unit_size_cap))
 
-#Maybe I can do a function for grouping rather than just filtering
-child_poverty <- poverty_by_group_filter(child) %>% mutate(Group = "Children")
+#applying functions
 overall_poverty <- poverty_by_group_filter(everyone) %>% mutate(Group = "Overall")
+child_poverty <- poverty_by_group_filter(child) %>% mutate(Group = "Children")
 poverty_by_race <- poverty_by_group(race_bin)
 poverty_by_race <- poverty_by_race %>% rename(Group=race_bin)
 poverty_by_employment_status <- poverty_by_group(employment_status)
 poverty_by_fam_unit_size <- poverty_by_group(spm_fam_unit_size_cap)
-
-#Function to make nice tables
+poverty_by_fam_unit_size
+#Function to make nice tables, need to edit for this stuff
+names(combo_poverty)
 table_maker <- function(dataframe,group_var,group_name) {
-  dataframe %>% rename(`Status Quo Poverty` = baseline_poverty_mean,
-                       `Reform Poverty` = reform_poverty_mean,
-                       `Poverty Reduction` = reform_poverty_reduction,
-                       `Status Quo Deep Poverty` = baseline_deep_poverty_mean,
-                       `Reform Deep Poverty` = reform_deep_poverty_mean,
-                       `Deep Poverty Reduction` = reform_deep_poverty_reduction,
+  dataframe %>% rename(`Status Quo Poverty` = baseline_poverty, #Probably could do this more effiecently
+                       `Status Quo Poverty 2x` = baseline_poverty_2x,
+                       `Status Quo Poverty 3x` = baseline_poverty_3x,
+                       `Status Quo Poverty 1-2x` = baseline_poverty_1_2x,
+                       `Status Quo Poverty 2-3x` = baseline_poverty_2_3x,
+                       `Status Quo Poverty 3-5x` = baseline_poverty_3_5x,
+                       `Status Quo Poverty 5x+` = baseline_poverty_5x_plus,
+                       `Post Reform Poverty` = post_reform_poverty,
+                       `Post Reform Poverty 2x` = post_reform_poverty_2x,
+                       `Post Reform Poverty 3x` = post_reform_poverty_3x,
+                       `Post Reform Poverty 1-2x` = post_reform_poverty_1_2x,
+                       `Post Reform Poverty 2-3x` = post_reform_poverty_2_3x,
+                       `Post Reform Poverty 3-5x` = post_reform_poverty_3_5x,
+                       `Post Reform Poverty 5x+` = post_reform_poverty_5x_plus,
                        {{group_name}} := {{group_var}}) %>% 
     mutate(across(where(is.numeric), round, 3)) %>% 
     mutate(across(where(is.numeric), ~ .x*100)) %>% 
     mutate(across(where(is.numeric),as.character)) %>% 
-    mutate(across(`Status Quo Poverty`:`Deep Poverty Reduction`, ~str_suffix(.x,"%"))) %>% 
+    mutate(across(`Status Quo Poverty`:`Post Reform Poverty 5x+`, ~str_suffix(.x,"%"))) %>% 
     relocate({{group_name}})
-  
 }
 #Applying function and a bit of manual cleanup
-poverty_by_fam_unit_size <- table_maker(poverty_by_fam_unit_size,spm_fam_unit_size_cap,`Family Size`)
+poverty_by_fam_unit_size_table <- table_maker(poverty_by_fam_unit_size,spm_fam_unit_size_cap,`Family Size`)
 
 combo_poverty <- bind_rows(overall_poverty,child_poverty,poverty_by_race) 
-combo_poverty <- table_maker(combo_poverty,Group,Group)
-poverty_by_employment_status <- table_maker(poverty_by_employment_status,employment_status,`Employment Status`)
 
-combo_poverty %>%
+combo_poverty_table <- table_maker(combo_poverty,Group,Group)
+
+poverty_by_employment_status_table <- table_maker(poverty_by_employment_status,employment_status,`Employment Status`)
+
+#This doesn't actually work well, but I guess I can just restrict the columns
+#Also need to order status quo, then reform, can use select
+combo_poverty_table %>%
   kbl() %>%
   kable_minimal() %>% 
   kable_styling(html_font = "Unna",
                 full_width = FALSE,
                 position = "center")
 
+
+#Making stacked bar charts showing poverty impact for different groups
+names(combo_poverty)
+#Maybe make this part a function that I just apply for different groupings
+bar_graph_prepper <- function(df) {
+  df %>% select(-c(baseline_poverty_2x,baseline_poverty_3x,post_reform_poverty_2x,post_reform_poverty_3x)) %>% 
+    pivot_longer(cols = baseline_poverty:post_reform_poverty_5x_plus) %>% 
+    mutate(baseline=ifelse(str_detect(name, "baseline"),"Baseline","Reform")) %>% 
+    mutate(name=str_remove(name,"baseline_"),
+           name=str_remove(name,"post_reform_"),
+           name=ifelse(name=="poverty","Baseline Poverty",
+                       ifelse(name=="poverty_1_2x", "1-2X Poverty",
+                              ifelse(name=="poverty_2_3x", "2-3X Poverty",
+                                     ifelse(name=="poverty_3_5x", "3-5X Poverty",
+                                            ifelse(name=="poverty_5x_plus","5X+ Poverty",NA))))),
+           name=fct_relevel(name,"Baseline Poverty")) #Possible reverse the order?
+}
+combo_poverty_for_bar_chart <- bar_graph_prepper(combo_poverty)
+
+
+combo_poverty_for_bar_chart %>% filter(Group!="Children") %>% 
+  mutate(Group=fct_relevel(Group, "Overall", "White")) %>% 
+  ggplot(aes(fill=name, y=value, x=baseline)) + #need to modify the orders of things and remove chilren, make that a seperate graph
+  geom_bar(position="stack", stat="identity", alpha = .5) +
+  facet_grid(~ Group) + #this works, but better to have it sie by side right?
+  #Maybe change the group variable, but i want it 
+  scale_fill_brewer(palette = "Set1", name = "") +
+  scale_color_grey() +
+  theme_jfi() +
+  labs(y = "Percent\nIn\nPoverty\nGroup",
+       x = "",
+       title = "Poverty Impacts of Hamilton Program\n") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5) 
+
+combo_poverty_for_bar_chart %>% filter(Group=="Children" | Group=="Overall") %>% 
+  mutate(Group=fct_relevel(Group, "Overall", "Children")) %>% 
+  ggplot(aes(fill=name, y=value, x=baseline)) + 
+  geom_bar(position="stack", stat="identity", alpha = .5) +
+  facet_grid(~ Group) + 
+  scale_fill_brewer(palette = "Set1", name = "") +
+  scale_color_grey() +
+  theme_jfi() +
+  labs(y = "Percent\nIn\nPoverty\nGroup",
+       x = "",
+       title = "Poverty Impacts of Hamilton Program\n") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5) 
+
+
+poverty_by_employment_status_bar_chart <- bar_graph_prepper(poverty_by_employment_status)
+poverty_by_employment_status_bar_chart
+#How did I get the percent in value, maybe I need to not go though table maker
+poverty_by_employment_status_bar_chart %>% filter(employment_status!="NA")  %>% 
+  ggplot(aes(fill=name, y=value, x=baseline)) + 
+  geom_bar(position="stack", stat="identity", alpha = .5) +
+  facet_grid(~ employment_status) +
+  scale_fill_brewer(palette = "Set1", name = "") +
+  scale_color_grey() +
+  theme_jfi() +
+  labs(y = "Percent\nIn\nPoverty\nGroup",
+       x = "",
+       title = "Poverty Impacts of Hamilton Program\n") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5) 
+
+
+poverty_by_fam_unit_size_bar_chart <- bar_graph_prepper(poverty_by_fam_unit_size)
+poverty_by_fam_unit_size_bar_chart #Maybe write out family unit size
+
+poverty_by_fam_unit_size_bar_chart %>%  
+  mutate(spm_fam_unit_size_cap=str_glue("Family\nSize: {spm_fam_unit_size_cap}")) %>% 
+  ggplot(aes(fill=name, y=value, x=baseline)) + 
+  geom_bar(position="stack", stat="identity", alpha = .5) +
+  facet_wrap(~ spm_fam_unit_size_cap, nrow = 2) + 
+  scale_fill_brewer(palette = "Set1", name = "") +
+  scale_color_grey() +
+  theme_jfi() +
+  labs(y = "Percent\nIn\nPoverty\nGroup",
+       x = "",
+       title = "Poverty Impacts of Hamilton Program\n") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5) 
+
+#Ok, this was nice, now what other graphs to make
+
+
+#Think about other viz possibilities, maybe like a line grpah type thing
+# 
+# combo_poverty %>% pivot_longer(cols = baseline_poverty:post_reform_poverty_5x_plus) %>% 
+#   mutate(baseline=ifelse(str_detect(name, "baseline"),"Baseline","Reform")) %>% 
+#   mutate(name=str_remove(name,"baseline_"),
+#          name=str_remove(name,"post_reform_")) %>% #Need to learn how to make this one line
+#   pivot_wider(names_from = baseline, values_from = value) %>% #I think I might actually need to make it one line
+
+
 #effect on median income since that's easy
-#illustrates how big this is
+#illustrates how big this is relative to Hamilton
 hamilton_analysis_data %>% 
   summarise(aftertax_fam_income_median_hamilton=median(diff_aftertax_income_family_hamilton),
             aftertax_fam_income_median=median(diff_aftertax_income_family_no_hamilton)) %>% 

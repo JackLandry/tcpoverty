@@ -1,4 +1,6 @@
 #Making data for marginal tax rates
+#could try to do this for nber, which has state taxes in addition to federal
+#could try to weight by state population or something for average federal tax rate
 
 income <- seq(from = 0, to = 100000, by = 100)
 married <- tibble(MARS = c(1,2))
@@ -19,12 +21,11 @@ marginal_tax_rate_diagram <- marginal_tax_rate_diagram %>% mutate(e00200p=ifelse
                                      e00200s=ifelse(MARS!=2,0,income*.5),
                                      e00200=income)
 #I think I can ignore XTOT if I use TJCA json
-
 # marginal_tax_rate_diagram %>% mutate(sum_incomes=e00200p + e00200s,
 #                                      incomes_not_equal=ifelse(sum_incomes!=e00200,1,0)) %>% 
 #   filter(incomes_not_equal==1)
 
-write_csv(marginal_tax_rate_diagram, "/Users/jacklandry/Documents/GitHub/tcpoverty/inter_data/marginal_tax_rate_test_data.csv")
+write_csv(marginal_tax_rate_diagram, here("inter_data","marginal_tax_rate_test_data.csv"))
 nrow(marginal_tax_rate_diagram)
 
 

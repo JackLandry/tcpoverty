@@ -15,8 +15,8 @@ library(tidyverse)
 # SETTINGS
 
 ## pexemp: Personal exemption for year of analysis
-pexemp <- data.frame(year=2017, pexemp = 4050)
-
+pexemp <- data.frame(year=2018, pexemp = 0) #Using 2019 data, which references income form 2018, 2018
+#https://taxfoundation.org/2018-tax-brackets/
 # ## wd: Working Directory
 # wd <- '~/Documents/data/cpsasec/make taxsim'
 # 
@@ -36,8 +36,8 @@ here()
 #### = My Comment
 # = original comment
 ####Import CPS data keeping some handly labels
-here()
-ddi <- read_ipums_ddi(here("cps_data","cps_00041.xml"))
+ddi <- read_ipums_ddi(here("cps_data","cps_00053.xml"))
+# ddi <- read_ipums_ddi(here("cps_data","cps_00041.xml"))
 #ddi <- read_ipums_ddi("/Users/jacklandry/Documents/GitHub/tcpoverty/cps_data/cps_00040.xml")
 ipum <-  read_ipums_micro(ddi)
 
@@ -161,8 +161,11 @@ names(pexemp)[1] <- 'x2'
 #### re-doing this with modern command
 ipum <- left_join(ipum, pexemp, by='x2')
 
+
 # adjusted gross - taxes + exemptions
-ipum$x16 <- ipum$adjginc - rowSums(ipum[,c('pexemp', 'proptax', 'statetax', 'taxinc')], na.rm=T)
+#proptax no longer available, should look at how AGI is calculated
+#Maybe calc AGI straight from the thing
+ipum$x16 <- ipum$adjginc - rowSums(ipum[,c('pexemp', 'statetax', 'taxinc')], na.rm=T)
 # no values less than 0
 ipum$x16 <- ifelse(ipum$x16 < 0, 0, ipum$x16)
 
@@ -298,7 +301,12 @@ concat <- concat %>% left_join(state_crosswalk_soi,  by = c("state" = "census_id
 
 #concat <- concat %>% mutate(state=0)
 ####I think this needs further editing to 
-write.table(concat, sep = " ", file = here("outputs","c17_taxsim"), row.names = F, col.names = F)
+concat %>% count(mstat)
+#Updated to c19
+write.table(concat, sep = " ", file = here("outputs","c19_taxsim"), row.names = F, col.names = F)
+concat
+head(concat)
+write_csv(concat, here("outputs","c19_taxsim.csv"))
 
 # The one after this is throwing an error...
 concat %>% filter(taxsimid==206401)

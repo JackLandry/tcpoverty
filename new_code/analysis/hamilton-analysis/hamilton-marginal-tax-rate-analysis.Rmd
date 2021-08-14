@@ -1,0 +1,250 @@
+---
+title: "Analysis of Institute on Race and Political Economy Guaranteed Income Proposal Marginal Tax Rates"
+author: "Jack Landry"
+# date: "5/24/2021"
+output: html_document
+---
+
+<style type="text/css">
+body{
+  font-family: Unna;
+  font-size: 12pt;
+}
+/* Headers */
+h1,h2,h3,h4,h5,h6{
+  font-size: 20pt;
+  text-align: left;
+}
+
+h1.title {
+  font-size: 38px;
+  text-align: center;
+}
+h4.author { 
+    font-size: 18px;
+  text-align: center;
+}
+h4.date { 
+  font-size: 18px;
+  text-align: center;
+}
+</style>
+
+
+
+Does not include value of benefits (e.g SNAP, Medicaid) or any state/local taxes. 
+
+```{r, include = FALSE}
+theme_jfi <- function () { 
+  theme_bw(base_size=12, base_family="Unna") %+replace% 
+    theme(panel.grid.minor = element_blank(),
+          plot.title = element_text(hjust = 0.5),
+          axis.title.y = element_text(angle=0, vjust = 0.5),
+          panel.background = element_rect(fill="#fffdfc"), #Not sure if this is actually modifying background
+          plot.background = element_rect(fill="#fffdfc"),
+          plot.margin=unit(c(.15,.75,.15,.15),"cm")) 
+}
+
+library(tidyverse)
+library(tidylog)
+library(stringr.tools)
+library(kableExtra)
+library(here)
+
+```
+
+```{r, include=FALSE}
+linesize <- 1.25
+line_trans <- .5
+mt_data <- read_rds(here("inter_data","mt_data_hamilton_for_analysis.Rds"))
+
+mt_data_long_mt_rates <- mt_data %>% 
+  select(e00200,couple_status,num_children,num_children_clean,marginal_tax_rate_hamilton_no_eitc,marginal_tax_rate_hamilton_eitc,
+         marginal_tax_rate) %>% 
+  pivot_longer(cols = c(marginal_tax_rate_hamilton_no_eitc,marginal_tax_rate_hamilton_eitc,marginal_tax_rate),
+               names_to = "tax_rate_type",
+               values_to = "marginal_tax_rate")
+
+mt_data_long_mt_rates
+
+mt_data_long_mt_rates <- mt_data_long_mt_rates %>% 
+  mutate(tax_rate_type=ifelse(tax_rate_type=="marginal_tax_rate", "Status Quo",
+                              ifelse(tax_rate_type=="marginal_tax_rate_hamilton_no_eitc","Hamilton Reform\nEIC Repealed", 
+                                     ifelse(tax_rate_type=="marginal_tax_rate_hamilton_eitc","Hamilton Reform\nKeep EIC",NA))))
+
+```
+
+```{r, include=FALSE}
+singles_marginal_tax_graph <- ggplot(data= mt_data_long_mt_rates %>% filter(couple_status=="Single" & num_children!=6 & e00200!=0), 
+       aes(x = e00200, y = marginal_tax_rate, group = tax_rate_type)) +
+  geom_line(aes(color = tax_rate_type), size=linesize, alpha = line_trans) +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Marginal\nTax Rate\nFor Additonal\n$100 Income",
+       x = "Labor Income",
+       title = "Marginal Tax Rates for Single Filers\n") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5, limits = c(-1,1.3), breaks = seq(-1,1,.5)) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        legend.title = element_blank(),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+
+couples_marginal_tax_graph <- ggplot(data= mt_data_long_mt_rates %>% filter(couple_status=="Couple" & num_children!=6 & e00200!=0), 
+       aes(x = e00200, y = marginal_tax_rate, group = tax_rate_type)) +
+  geom_line(aes(color=tax_rate_type),size=linesize, alpha = line_trans) +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Marginal\nTax Rate\nFor Additonal\n$100 Income",
+       x = "Labor Income",
+       title = "Marginal Tax Rates for Married Filers\n",
+       caption = "Jain Family Institute") +
+  theme_bw() +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5, limits = c(-1,1.3), breaks = seq(-1,1,.5)) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1, size = 8),
+        legend.title = element_blank(),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+```
+
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, figures-marginal-tax-hamilton, fig.show="hold", out.width="50%"}
+singles_marginal_tax_graph
+couples_marginal_tax_graph
+```
+
+```{r, include = FALSE}
+linesize <- 1.25
+line_trans <- .5
+
+
+
+#Want to do the same thing here, include current EITC
+mt_data_long_posttax_income <- mt_data %>% 
+  select(e00200,couple_status,num_children,num_children_clean,aftertax_hamilton_no_eitc,aftertax_hamilton_eitc,aftertax_income) %>% 
+  pivot_longer(cols = c(aftertax_hamilton_no_eitc,aftertax_hamilton_eitc,aftertax_income),
+               names_to = "aftertax_income_type",
+               values_to = "aftertax_income")
+
+
+mt_data_long_posttax_income <- mt_data_long_posttax_income %>% 
+  mutate(aftertax_income_type=ifelse(aftertax_income_type=="aftertax_income", "Status Quo",
+                                     ifelse(aftertax_income_type=="aftertax_hamilton_no_eitc","Hamilton Reform\nEIC Repealed", 
+                                            ifelse(aftertax_income_type=="aftertax_hamilton_eitc","Hamilton Reform\nKeep EIC",NA))))
+
+
+
+
+#Need to change the y axis to start at 0
+singles_posttax_hamilton_inc_graph <- ggplot(data= mt_data_long_posttax_income %>% filter(couple_status=="Single" & num_children!=6 & e00200!=0 & e00200<=60000), 
+       aes(x = e00200, y = aftertax_income, group = aftertax_income_type)) +
+  geom_line(aes(color = aftertax_income_type), size=linesize, alpha = line_trans) +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Aftertax\nIncome",
+       x = "Labor Income",
+       title = "Pre vs- Post Tax Income for Single Filers\n") +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 6, limits = c(0,80000)) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        legend.title = element_blank(),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+couples_posttax_hamilton_inc_graph <- ggplot(data= mt_data_long_posttax_income %>% filter(couple_status=="Couple" & num_children!=6 & e00200!=0 & e00200<=80000), 
+       aes(x = e00200, y = aftertax_income, group = aftertax_income_type)) +
+  geom_line(aes(color = aftertax_income_type), size=linesize, alpha = line_trans) +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Aftertax\nIncome",
+       x = "Labor Income",
+       title = "Pre vs- Post Tax Income for Married Filers\n") +
+  scale_y_continuous(labels=scales::dollar_format(), n.breaks = 6, limits = c(0,80000)) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        legend.title = element_blank(),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+```
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, figures-posttax-inc-hamilton, fig.show="hold", out.width="50%"}
+singles_posttax_hamilton_inc_graph
+couples_posttax_hamilton_inc_graph
+```
+
+```{r, include=FALSE}
+
+#######################
+nber_data <- read_rds(here("inter_data","nber_data_hamilton_for_analysis.Rds"))
+#Want to show the difference between 
+nber_data_long <- nber_data %>% 
+  select(pretax_income,couple_status,num_children,num_children_clean,marginal_tax_rate_hamilton_no_eitc,marginal_tax_rate_hamilton_eitc,
+         marginal_tax_rate,marginal_tax_rate_federal_only,marginal_tax_rate_hamilton_no_eitc_fed_only) %>% 
+  pivot_longer(cols = c(marginal_tax_rate_hamilton_no_eitc,marginal_tax_rate_hamilton_eitc,marginal_tax_rate,
+                        marginal_tax_rate_federal_only,marginal_tax_rate_hamilton_no_eitc_fed_only),
+               names_to = "tax_rate_type",
+               values_to = "marginal_tax_rate")
+
+#Need to fix this for the new tax rate types
+nber_data_long <- nber_data_long %>% 
+  mutate(tax_rate_type=ifelse(tax_rate_type=="marginal_tax_rate", "Status Quo",
+                              ifelse(tax_rate_type=="marginal_tax_rate_hamilton_no_eitc","Hamilton Reform\nEIC Repealed", 
+                                     ifelse(tax_rate_type=="marginal_tax_rate_hamilton_eitc","Hamilton Reform\nKeep EIC",
+                                            ifelse(tax_rate_type=="marginal_tax_rate_federal_only","Status Quo Federal Only",
+                                                   ifelse(tax_rate_type=="marginal_tax_rate_hamilton_no_eitc_fed_only","Hamilton Reform\nEIC Repealed\nFed Only",NA))))))
+
+#Don' understand why it's not showing a difference
+
+#nber_data_long %>% filter(tax_rate_type=="Status Quo Federal Only"|tax_rate_type=="Status Quo") %>% View()
+nber_data_long <- nber_data_long %>% filter(tax_rate_type!="Status Quo Federal Only" & tax_rate_type != "Hamilton Reform\nEIC Repealed\nFed Only")
+#How can this be correct????
+
+nber_singles <- ggplot(data= nber_data_long %>% filter(couple_status=="Single" & num_children!=6 & pretax_income!=0 & !is.na(tax_rate_type)), 
+       aes(x = pretax_income, y = marginal_tax_rate, group = tax_rate_type)) +
+  geom_line(aes(color = tax_rate_type), size=linesize, alpha = line_trans) +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Marginal\nTax Rate\nFor Additonal\n$100 Income",
+       x = "Labor Income",
+       title = "Marginal Tax Rates for Single Filers\n") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5, limits = c(-1,1.3), breaks = seq(-1,1,.5)) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        legend.title = element_blank(),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+#Issue with single mothers geting EIC
+nber_couples <- ggplot(data= nber_data_long %>% filter(couple_status=="Couple" & num_children!=6 & pretax_income!=0 & !is.na(tax_rate_type)), 
+       aes(x = pretax_income, y = marginal_tax_rate, group = tax_rate_type)) +
+  geom_line(aes(color = tax_rate_type), size=linesize, alpha = line_trans) +
+  facet_wrap(vars(num_children_clean)) +
+  labs(y = "Marginal\nTax Rate\nFor Additonal\n$100 Income",
+       x = "Labor Income",
+       title = "Marginal Tax Rates for Married Filers\n") +
+  scale_y_continuous(labels=scales::percent_format(), n.breaks = 5, limits = c(-1,1.3), breaks = seq(-1,1,.5)) +
+  scale_x_continuous(labels=scales::dollar_format()) +
+  theme_jfi() +
+  theme(axis.text.x = element_text(angle = 20, vjust = 1, hjust=1),
+        legend.title = element_blank(),
+        # axis.text.y = element_text(angle = 20, vjust = 1, hjust=1),
+        axis.title.y = element_text(margin = margin(t = 0, r = 15, b = 0, l = 0)))
+
+```
+
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, figures-posttax-inc-hamilton-nber, fig.show="hold", out.width="50%"}
+nber_singles
+nber_couples
+```
+
+
+Want to also do pre-post tax income with NBER, add property taxes and rent which are probably important
+
+
+
+<!-- Another issues might be incentives to file jointly vs. as single for cohabitators/married... I think for some there'd be an incentive to file seperatly -->
